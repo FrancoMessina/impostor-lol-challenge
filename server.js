@@ -33,13 +33,15 @@ io.on("connection", (socket) => {
     if (!rooms[room]) return;
     const champions = await getChampions();
 
+    // Elige un campeón aleatorio para todos
+    const champ = champions[Math.floor(Math.random() * champions.length)];
+
     // shuffle jugadores
     let shuffled = [...rooms[room].players].sort(() => Math.random() - 0.5);
 
     shuffled.forEach((player, i) => {
-      let champ = champions[Math.floor(Math.random() * champions.length)];
       let impostor = i === 0; // primero impostor
-      io.to(player.id).emit("role", { champ, impostor });
+      io.to(player.id).emit("role", { champ: impostor ? null : champ, impostor });
     });
 
     rooms[room].started = true;

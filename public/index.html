@@ -48,9 +48,12 @@
     });
 
     socket.on("role", ({ champ, impostor }) => {
-      document.getElementById("role").innerText =
-        impostor ? `IMPOSTOR con ${champ}` : `Eres ${champ}`;
-    });
+    document.getElementById("role").innerText =
+      impostor
+        ? "Eres el IMPOSTOR. Tu objetivo es adivinar el campeón de los demás."
+        : `Eres ${champ}`;
+  });
+    
   </script>
 </body>
 </html>
