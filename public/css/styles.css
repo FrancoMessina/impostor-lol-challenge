@@ -1,59 +1,736 @@
+/* ====== FUENTES Y COLORES TEMÁTICOS ====== */
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+
+:root {
+  /* Colores primarios de League of Legends */
+  --lol-gold: #C89B3C;
+  --lol-blue: #0F2027;
+  --lol-light-blue: #1E3C72;
+  --lol-dark-blue: #0A1428;
+  --lol-accent: #F0E6D2;
+  --lol-red: #C8AA6E;
+  --lol-purple: #463714;
+  
+  /* Colores del juego */
+  --impostor-color: #DC2626;
+  --investigator-color: #2563EB;
+  --neutral-color: #6B7280;
+  --success-color: #059669;
+  --warning-color: #D97706;
+  
+  /* Fondos */
+  --bg-primary: linear-gradient(135deg, #0F2027 0%, #203A43 50%, #2C5364 100%);
+  --bg-secondary: linear-gradient(135deg, #1E3C72 0%, #2A5298 100%);
+  --bg-card: rgba(15, 32, 39, 0.95);
+  --bg-panel: rgba(30, 60, 114, 0.15);
+  
+  /* Sombras y efectos */
+  --shadow-gold: 0 0 20px rgba(200, 155, 60, 0.3);
+  --shadow-blue: 0 0 15px rgba(30, 60, 114, 0.4);
+  --glow-gold: 0 0 30px rgba(200, 155, 60, 0.6);
+  --border-gold: 2px solid var(--lol-gold);
+}
+
+/* ====== ESTILOS GLOBALES ====== */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
 body {
-    font-family: 'Arial', sans-serif;
-    background-color: #f4f4f4;
-    margin: 0;
-    padding: 0;
+  font-family: 'Inter', sans-serif;
+  background: var(--bg-primary);
+  color: var(--lol-accent);
+  overflow-x: hidden;
+  min-height: 100vh;
 }
 
-.header {
-    background-color: #007bff;
-    color: white;
-    padding: 20px;
-    text-align: center;
+.screen {
+  min-height: 100vh;
+  position: relative;
 }
 
-.container {
-    max-width: 1200px;
-    margin: auto;
-    padding: 20px;
+/* ====== FONDOS ANIMADOS ====== */
+.lol-background {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--bg-primary);
+  z-index: -2;
 }
 
-.champion-card {
-    background-color: white;
-    border: 1px solid #ddd;
-    border-radius: 5px;
-    margin: 15px;
-    padding: 15px;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-    transition: transform 0.2s;
+.lol-background::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: 
+    radial-gradient(circle at 20% 80%, rgba(200, 155, 60, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(30, 60, 114, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 40% 40%, rgba(200, 155, 60, 0.05) 0%, transparent 50%);
+  animation: backgroundFloat 20s ease-in-out infinite;
 }
 
-.champion-card:hover {
-    transform: scale(1.05);
+.lol-background-game {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #0A1428 0%, #1E3C72 50%, #0F2027 100%);
+  z-index: -2;
+  opacity: 0.95;
 }
 
-.champion-name {
-    font-size: 1.5em;
-    color: #333;
+@keyframes backgroundFloat {
+  0%, 100% { opacity: 0.3; transform: translateY(0px) scale(1); }
+  50% { opacity: 0.6; transform: translateY(-20px) scale(1.05); }
 }
 
-.champion-role {
-    font-size: 1.2em;
-    color: #666;
+/* ====== COMPONENTES PRINCIPALES ====== */
+.lol-card {
+  background: var(--bg-card);
+  border: var(--border-gold);
+  border-radius: 15px;
+  padding: 2rem;
+  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-gold);
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
 }
 
-.footer {
-    background-color: #007bff;
-    color: white;
-    text-align: center;
-    padding: 10px;
-    position: relative;
-    bottom: 0;
-    width: 100%;
+.lol-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(45deg, transparent 49%, rgba(200, 155, 60, 0.1) 50%, transparent 51%);
+  animation: borderShine 3s linear infinite;
+  pointer-events: none;
+}
+
+.lol-card-main {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+@keyframes borderShine {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* ====== TÍTULO DEL JUEGO ====== */
+.game-title {
+  font-family: 'Cinzel', serif;
+  font-size: 3.5rem;
+  font-weight: 700;
+  background: linear-gradient(45deg, var(--lol-gold), #F0E6D2, var(--lol-gold));
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: goldShimmer 2s ease-in-out infinite;
+  text-shadow: 0 0 30px rgba(200, 155, 60, 0.5);
+  margin-bottom: 0.5rem;
+}
+
+.game-subtitle {
+  font-size: 1.1rem;
+  color: var(--lol-accent);
+  opacity: 0.8;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+@keyframes goldShimmer {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+/* ====== BOTONES TEMÁTICOS ====== */
+.btn-lol {
+  font-weight: 600;
+  padding: 12px 24px;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-lol::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+
+.btn-lol:hover::before {
+  left: 100%;
+}
+
+.btn-lol.btn-primary {
+  background: var(--lol-light-blue);
+  border-color: var(--lol-blue);
+  color: var(--lol-accent);
+}
+
+.btn-lol.btn-primary:hover {
+  background: var(--lol-blue);
+  box-shadow: var(--shadow-blue);
+  transform: translateY(-2px);
+}
+
+.btn-lol.btn-success {
+  background: var(--success-color);
+  border-color: #047857;
+  color: white;
+}
+
+.btn-lol.btn-success:hover {
+  background: #047857;
+  box-shadow: 0 0 15px rgba(5, 150, 105, 0.4);
+  transform: translateY(-2px);
+}
+
+.btn-lol.btn-warning {
+  background: var(--lol-gold);
+  border-color: #B45309;
+  color: var(--lol-dark-blue);
+  font-weight: 700;
+}
+
+.btn-lol.btn-warning:hover {
+  background: #B45309;
+  color: var(--lol-accent);
+  box-shadow: var(--glow-gold);
+  transform: translateY(-2px);
+}
+
+/* ====== INPUTS TEMÁTICOS ====== */
+.lol-input, .form-control {
+  background: rgba(15, 32, 39, 0.8);
+  border: 2px solid rgba(200, 155, 60, 0.3);
+  border-radius: 8px;
+  color: var(--lol-accent);
+  padding: 12px 16px;
+  transition: all 0.3s ease;
+}
+
+.lol-input:focus, .form-control:focus {
+  background: rgba(15, 32, 39, 0.95);
+  border-color: var(--lol-gold);
+  box-shadow: 0 0 15px rgba(200, 155, 60, 0.3);
+  color: var(--lol-accent);
+}
+
+.lol-input::placeholder, .form-control::placeholder {
+  color: rgba(240, 230, 210, 0.6);
+}
+
+.input-group-text {
+  background: var(--lol-gold);
+  border-color: var(--lol-gold);
+  color: var(--lol-dark-blue);
+  font-weight: 600;
+}
+
+/* ====== GRID DE JUGADORES ====== */
+.players-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+  margin: 1rem 0;
+}
+
+.empty-slot, .player-slot {
+  background: rgba(30, 60, 114, 0.2);
+  border: 2px dashed rgba(200, 155, 60, 0.3);
+  border-radius: 8px;
+  padding: 15px 8px;
+  text-align: center;
+  font-size: 0.9rem;
+  transition: all 0.3s ease;
+  min-height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.player-slot {
+  background: var(--bg-panel);
+  border: 2px solid var(--lol-gold);
+  color: var(--lol-accent);
+  font-weight: 600;
+  animation: playerJoin 0.5s ease;
+}
+
+@keyframes playerJoin {
+  0% { opacity: 0; transform: scale(0.8); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* ====== REGLAS DEL JUEGO ====== */
+.game-rules {
+  background: rgba(30, 60, 114, 0.1);
+  border-radius: 12px;
+  padding: 1.5rem;
+  border: 1px solid rgba(200, 155, 60, 0.2);
+}
+
+.rule-item {
+  text-align: center;
+  padding: 1rem;
+  background: rgba(15, 32, 39, 0.3);
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
+  transition: transform 0.3s ease;
+}
+
+.rule-item:hover {
+  transform: translateY(-2px);
+}
+
+.rule-item i {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
+/* ====== PANTALLA DE JUEGO ====== */
+.game-header {
+  background: rgba(15, 32, 39, 0.95);
+  border-bottom: 3px solid var(--lol-gold);
+  padding: 1rem 0;
+  backdrop-filter: blur(10px);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.room-code, .round-info {
+  font-weight: 600;
+  color: var(--lol-accent);
+  font-size: 1.1rem;
+}
+
+.phase-title {
+  font-family: 'Cinzel', serif;
+  color: var(--lol-gold);
+  margin-bottom: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+/* ====== TEMPORIZADOR ====== */
+.timer-container {
+  display: flex;
+  justify-content: center;
+  margin: 1rem 0;
+}
+
+.timer-circle {
+  width: 80px;
+  height: 80px;
+  border: 4px solid var(--lol-gold);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle, rgba(200, 155, 60, 0.1), transparent);
+  box-shadow: var(--glow-gold);
+  animation: timerPulse 1s ease-in-out infinite;
+  position: relative;
+}
+
+.timer-circle::before {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  border-top: 2px solid var(--lol-gold);
+  animation: timerSpin 1s linear infinite;
+}
+
+#timer-text {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--lol-gold);
+  z-index: 1;
+}
+
+@keyframes timerPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+@keyframes timerSpin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* ====== PANELES DEL JUEGO ====== */
+.game-container {
+  padding: 2rem 0;
+}
+
+.game-panel {
+  background: var(--bg-card);
+  border: 1px solid rgba(200, 155, 60, 0.3);
+  border-radius: 12px;
+  padding: 1.5rem;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 32px rgba(15, 32, 39, 0.3);
+  margin-bottom: 1rem;
+  height: fit-content;
+}
+
+/* ====== INFORMACIÓN DEL JUGADOR ====== */
+.player-info-card {
+  text-align: center;
+  background: rgba(30, 60, 114, 0.1);
+  border-radius: 10px;
+  padding: 1.5rem;
+  border: 1px solid rgba(200, 155, 60, 0.2);
+}
+
+.role-display {
+  margin-top: 1rem;
+}
+
+.role-icon {
+  width: 60px;
+  height: 60px;
+  margin: 0 auto 1rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  transition: all 0.3s ease;
+}
+
+.role-icon.impostor {
+  background: linear-gradient(45deg, var(--impostor-color), #EF4444);
+  color: white;
+  box-shadow: 0 0 20px rgba(220, 38, 38, 0.4);
+}
+
+.role-icon.investigator {
+  background: linear-gradient(45deg, var(--investigator-color), #3B82F6);
+  color: white;
+  box-shadow: 0 0 20px rgba(37, 99, 235, 0.4);
+}
+
+.role-text {
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+/* ====== LISTA DE JUGADORES EN JUEGO ====== */
+.game-players-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.game-player-item {
+  display: flex;
+  align-items: center;
+  padding: 12px;
+  margin-bottom: 8px;
+  background: rgba(30, 60, 114, 0.1);
+  border-radius: 8px;
+  border-left: 4px solid var(--lol-gold);
+  transition: all 0.3s ease;
+}
+
+.game-player-item:hover {
+  background: rgba(30, 60, 114, 0.2);
+  transform: translateX(5px);
+}
+
+.game-player-item.eliminated {
+  opacity: 0.5;
+  background: rgba(220, 38, 38, 0.1);
+  border-left-color: var(--impostor-color);
+}
+
+.game-player-item.current-turn {
+  background: rgba(200, 155, 60, 0.2);
+  border-left-color: var(--lol-gold);
+  box-shadow: 0 0 15px rgba(200, 155, 60, 0.3);
+}
+
+/* ====== CHAT ====== */
+.chat-section {
+  height: 600px;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  background: rgba(15, 32, 39, 0.5);
+  border-radius: 10px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  border: 1px solid rgba(200, 155, 60, 0.2);
+  max-height: 400px;
+}
+
+.chat-message {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  animation: messageSlide 0.3s ease;
+}
+
+.chat-message.system {
+  background: rgba(107, 114, 128, 0.2);
+  border-left: 4px solid var(--neutral-color);
+  font-style: italic;
+  color: var(--lol-accent);
+}
+
+.chat-message.player {
+  background: rgba(30, 60, 114, 0.15);
+  border-left: 4px solid var(--investigator-color);
+}
+
+.chat-message.impostor {
+  background: rgba(220, 38, 38, 0.15);
+  border-left: 4px solid var(--impostor-color);
+}
+
+.chat-message.description {
+  background: rgba(200, 155, 60, 0.15);
+  border-left: 4px solid var(--lol-gold);
+  font-weight: 600;
+}
+
+.message-header {
+  font-weight: 600;
+  color: var(--lol-gold);
+  margin-bottom: 4px;
+  font-size: 0.9rem;
+}
+
+.message-content {
+  color: var(--lol-accent);
+  line-height: 1.4;
+}
+
+.message-time {
+  font-size: 0.8rem;
+  color: rgba(240, 230, 210, 0.6);
+  float: right;
+}
+
+@keyframes messageSlide {
+  0% { opacity: 0; transform: translateY(20px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* ====== INPUT DE DESCRIPCIÓN ====== */
+.description-input {
+  background: rgba(200, 155, 60, 0.1);
+  border: 2px solid var(--lol-gold);
+  border-radius: 10px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  animation: descriptionGlow 2s ease-in-out infinite;
+}
+
+@keyframes descriptionGlow {
+  0%, 100% { box-shadow: 0 0 10px rgba(200, 155, 60, 0.3); }
+  50% { box-shadow: 0 0 20px rgba(200, 155, 60, 0.6); }
+}
+
+/* ====== VOTACIÓN ====== */
+.voting-section {
+  text-align: center;
+}
+
+.voting-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.vote-btn {
+  background: rgba(30, 60, 114, 0.2);
+  border: 2px solid rgba(200, 155, 60, 0.3);
+  border-radius: 8px;
+  padding: 12px;
+  color: var(--lol-accent);
+  font-weight: 600;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.vote-btn:hover {
+  background: rgba(30, 60, 114, 0.4);
+  border-color: var(--lol-gold);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(200, 155, 60, 0.3);
+}
+
+.vote-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.vote-btn.voted {
+  background: var(--lol-gold);
+  color: var(--lol-dark-blue);
+  border-color: var(--lol-gold);
+}
+
+/* ====== RESULTADOS ====== */
+.result-content {
+  text-align: center;
+  padding: 1rem;
+  border-radius: 10px;
+  background: rgba(30, 60, 114, 0.1);
+}
+
+.result-winner {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+}
+
+.result-winner.impostor {
+  color: var(--impostor-color);
+}
+
+.result-winner.investigators {
+  color: var(--investigator-color);
+}
+
+/* ====== ALERTAS FLOTANTES ====== */
+.alert-floating {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+  animation: alertSlide 0.5s ease;
+  border-radius: 10px;
+  border: none;
+  font-weight: 600;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+@keyframes alertSlide {
+  0% { opacity: 0; transform: translateX(100%); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+
+/* ====== SCROLLBAR PERSONALIZADO ====== */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(15, 32, 39, 0.5);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--lol-gold);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #B45309;
+}
+
+/* ====== RESPONSIVE DESIGN ====== */
+@media (max-width: 1200px) {
+  .game-container {
+    padding: 1rem 0.5rem;
+  }
+  
+  .game-panel {
+    margin-bottom: 1rem;
+  }
 }
 
 @media (max-width: 768px) {
-    .champion-card {
-        margin: 10px;
-    }
+  .game-title {
+    font-size: 2.5rem;
+  }
+  
+  .lol-card {
+    padding: 1.5rem;
+  }
+  
+  .players-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .chat-section {
+    height: 400px;
+  }
+  
+  .chat-messages {
+    max-height: 250px;
+  }
+  
+  .timer-circle {
+    width: 60px;
+    height: 60px;
+  }
+  
+  #timer-text {
+    font-size: 1.2rem;
+  }
+  
+  .game-header {
+    padding: 0.5rem 0;
+  }
+  
+  .phase-title {
+    font-size: 1.5rem;
+  }
+}
+
+@media (max-width: 576px) {
+  .game-title {
+    font-size: 2rem;
+  }
+  
+  .btn-lol {
+    padding: 10px 16px;
+    font-size: 0.9rem;
+    display: block;
+    width: 100%;
+    margin-bottom: 0.5rem;
+  }
+  
+  .players-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .voting-buttons .vote-btn {
+    font-size: 0.9rem;
+    padding: 10px;
+  }
 }
