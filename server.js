@@ -37,12 +37,29 @@ async function getChampions() {
   try {
     const res = await fetch("https://ddragon.leagueoflegends.com/cdn/14.17.1/data/en_US/champion.json");
     const data = await res.json();
-    return Object.keys(data.data);
+    return data.data; // Devolver datos completos en lugar de solo nombres
   } catch (error) {
     console.error("Error obteniendo campeones:", error);
-    // Campeones de respaldo
-    return ["Ahri", "Jinx", "Yasuo", "Lux", "Zed", "Katarina", "Ezreal", "Ashe", "Garen", "Darius"];
+    // Campeones de respaldo con datos básicos
+    const fallbackChamps = {};
+    ["Ahri", "Jinx", "Yasuo", "Lux", "Zed", "Katarina", "Ezreal", "Ashe", "Garen", "Darius"].forEach(name => {
+      fallbackChamps[name] = {
+        id: name,
+        name: name,
+        image: { full: `${name}.png` }
+      };
+    });
+    return fallbackChamps;
   }
+}
+
+function getChampionImageUrl(championData, championKey) {
+  const version = "14.17.1";
+  if (championData[championKey] && championData[championKey].image) {
+    return `https://ddragon.leagueoflegends.com/cdn/${version}/img/champion/${championData[championKey].image.full}`;
+  }
+  // URL de respaldo
+  return `https://ddragon.leagueoflegends.com/cdn/${version}/img/champion/${championKey}.png`;
 }
 
 function initializeRoom(roomCode) {
@@ -179,8 +196,17 @@ io.on("connection", (socket) => {
     }
 
     try {
-      const champions = await getChampions();
-      const champion = champions[Math.floor(Math.random() * champions.length)];
+      const championsData = await getChampions();
+      const championKeys = Object.keys(championsData);
+      const selectedChampionKey = championKeys[Math.floor(Math.random() * championKeys.length)];
+      const selectedChampion = championsData[selectedChampionKey];
+      
+      const championInfo = {
+        name: selectedChampion.name || selectedChampionKey,
+        image: getChampionImageUrl(championsData, selectedChampionKey),
+        title: selectedChampion.title || "",
+        key: selectedChampionKey
+      };
       
       // Mezclar jugadores y asignar impostor
       let shuffledPlayers = [...roomData.players].sort(() => Math.random() - 0.5);
@@ -194,7 +220,8 @@ io.on("connection", (socket) => {
       });
 
       roomData.players = shuffledPlayers;
-      roomData.champion = champion;
+      roomData.champion = championInfo.name;
+      roomData.championData = championInfo; // Guardar datos completos del campeón
       roomData.impostorIndex = impostorIndex;
       roomData.state = GAME_STATES.DESCRIBING;
       roomData.currentTurn = 0;
@@ -204,7 +231,8 @@ io.on("connection", (socket) => {
       // Enviar roles a cada jugador
       roomData.players.forEach(player => {
         io.to(player.id).emit("roleAssigned", {
-          champion: player.impostor ? null : champion,
+          champion: player.impostor ? null : championInfo.name,
+          championData: player.impostor ? null : championInfo,
           impostor: player.impostor,
           gameState: GAME_STATES.DESCRIBING
         });
@@ -539,6 +567,7 @@ function endGame(room, winner) {
     winner: winner,
     message: winMessage,
     champion: roomData.champion,
+    championData: roomData.championData,
     impostor: roomData.players.find(p => p.impostor).name
   });
 

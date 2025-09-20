@@ -402,39 +402,66 @@ function startTimer(duration, startTime) {
 function updatePlayerRole(roleData) {
   gameState.isImpostor = roleData.impostor;
   gameState.champion = roleData.champion;
+  gameState.championData = roleData.championData;
   gameState.hasDescribed = false;
   
   const roleIcon = elements.playerRole.querySelector('.role-icon');
   const roleText = elements.playerRole.querySelector('.role-text');
   
+  // Limpiar contenido previo
+  roleText.innerHTML = '';
+  
   if (roleData.impostor) {
     roleIcon.innerHTML = '<i class="fas fa-mask"></i>';
     roleIcon.className = 'role-icon impostor';
-    roleText.textContent = 'IMPOSTOR';
-    roleText.style.color = '#DC2626';
     
-    // Agregar texto explicativo
-    const explanation = document.createElement('p');
-    explanation.className = 'role-explanation';
-    explanation.textContent = 'No conoces el campeón. Debes adivinar basándote en las pistas.';
-    explanation.style.fontSize = '0.9rem';
-    explanation.style.opacity = '0.8';
-    explanation.style.marginTop = '0.5rem';
-    
-    roleText.appendChild(explanation);
+    roleText.innerHTML = `
+      <div style="font-size: 1.2rem; font-weight: 700; color: #DC2626; margin-bottom: 1rem;">
+        IMPOSTOR
+      </div>
+      <div class="champion-explanation">
+        No conoces el campeón. Debes adivinar basándote en las pistas de los demás jugadores.
+      </div>
+    `;
   } else {
     roleIcon.innerHTML = '<i class="fas fa-search"></i>';
     roleIcon.className = 'role-icon investigator';
-    roleText.innerHTML = `
-      <div>INVESTIGADOR</div>
-      <div style="font-size: 1.3rem; font-weight: 700; color: #C89B3C; margin-top: 0.5rem;">
-        ${roleData.champion}
+    
+    let championContent = `
+      <div style="font-size: 1.2rem; font-weight: 700; color: #2563EB; margin-bottom: 1rem;">
+        INVESTIGADOR
       </div>
-      <p style="font-size: 0.9rem; opacity: 0.8; margin-top: 0.5rem;">
-        Describe este campeón sin ser obvio. Encuentra al impostor.
-      </p>
     `;
-    roleText.style.color = '#2563EB';
+    
+    // Agregar imagen del campeón si está disponible
+    if (roleData.championData && roleData.championData.image) {
+      championContent += `
+        <div class="champion-image-container">
+          <img src="${roleData.championData.image}" 
+               alt="${roleData.championData.name}" 
+               class="champion-image"
+               onerror="this.style.display='none';">
+        </div>
+      `;
+    }
+    
+    championContent += `
+      <div class="champion-info">
+        <div class="champion-name">${roleData.championData ? roleData.championData.name : roleData.champion}</div>
+    `;
+    
+    if (roleData.championData && roleData.championData.title) {
+      championContent += `<div class="champion-title">${roleData.championData.title}</div>`;
+    }
+    
+    championContent += `
+        <div class="champion-explanation">
+          Describe este campeón sin ser obvio. Encuentra al impostor.
+        </div>
+      </div>
+    `;
+    
+    roleText.innerHTML = championContent;
   }
   
   switchToGameScreen();
@@ -573,11 +600,37 @@ socket.on('gameEnd', (endData) => {
     <div class="result-winner ${endData.winner}">
       ${endData.message}
     </div>
+  `;
+  
+  // Agregar imagen del campeón si está disponible
+  if (endData.championData && endData.championData.image) {
+    endHTML += `
+      <div class="champion-image-container" style="margin: 1.5rem 0;">
+        <img src="${endData.championData.image}" 
+             alt="${endData.championData.name}" 
+             class="champion-image"
+             onerror="this.style.display='none';">
+      </div>
+    `;
+  }
+  
+  endHTML += `
     <div style="margin-top: 1rem;">
-      <strong>El campeón era:</strong> ${endData.champion}<br>
-      <strong>El impostor era:</strong> ${endData.impostor}
+      <div class="champion-info">
+        <div class="champion-name">${endData.champion}</div>
+  `;
+  
+  if (endData.championData && endData.championData.title) {
+    endHTML += `<div class="champion-title">${endData.championData.title}</div>`;
+  }
+  
+  endHTML += `
+      </div>
+      <div style="margin-top: 1rem; color: var(--lol-accent);">
+        <strong>El impostor era:</strong> ${endData.impostor}
+      </div>
     </div>
-    <button class="btn btn-lol btn-warning" onclick="location.reload()" style="margin-top: 1rem;">
+    <button class="btn btn-lol btn-warning" onclick="location.reload()" style="margin-top: 1.5rem;">
       <i class="fas fa-redo"></i> Jugar Otra Vez
     </button>
   `;
