@@ -26,7 +26,7 @@ const GAME_STATES = {
 // Configuración del juego
 const GAME_CONFIG = {
   MAX_PLAYERS: 5,
-  DESCRIBE_TIME: 10, // segundos por turno
+  DESCRIBE_TIME: 20, // segundos por turno
   DEBATE_TIME: 50, // segundos para debate
   VOTING_TIME: 30 // segundos para votar
 };
@@ -226,9 +226,10 @@ io.on("connection", (socket) => {
       });
 
       // Enviar estado del juego
+      const currentPlayer = roomData.players[roomData.currentTurn];
       socket.emit('gameStateUpdate', {
         state: roomData.state,
-        currentPlayer: roomData.players[roomData.currentTurn]?.name,
+        currentPlayer: currentPlayer && !currentPlayer.eliminated ? currentPlayer.name : null,
         round: roomData.round,
         candidates: roomData.state === GAME_STATES.VOTING ? 
           roomData.players.filter(p => !p.eliminated).map(p => p.name) : undefined
@@ -322,9 +323,15 @@ io.on("connection", (socket) => {
       roomData.championData = championInfo; // Guardar datos completos del campeón
       roomData.impostorIndex = impostorIndex;
       roomData.state = GAME_STATES.DESCRIBING;
-      roomData.currentTurn = 0;
       roomData.votes = {};
       roomData.round++;
+
+      // Encontrar el primer jugador vivo (al inicio todos están vivos, pero por consistencia)
+      let firstAliveIndex = 0;
+      while (firstAliveIndex < roomData.players.length && roomData.players[firstAliveIndex].eliminated) {
+        firstAliveIndex++;
+      }
+      roomData.currentTurn = firstAliveIndex;
 
       // Enviar roles a cada jugador
       roomData.players.forEach(player => {
@@ -339,14 +346,14 @@ io.on("connection", (socket) => {
       // Enviar estado inicial del juego
       io.to(room).emit('gameStateUpdate', {
         state: GAME_STATES.DESCRIBING,
-        currentPlayer: roomData.players[0].name,
+        currentPlayer: roomData.players[roomData.currentTurn].name,
         round: roomData.round,
         champion: null // Los investigadores ya saben el campeón
       });
 
       io.to(room).emit('chatMessage', {
         type: 'system',
-        message: `¡Juego iniciado! Ronda ${roomData.round}. Es el turno de ${roomData.players[0].name} para describir.`,
+        message: `¡Juego iniciado! Ronda ${roomData.round}. Es el turno de ${roomData.players[roomData.currentTurn].name} para describir.`,
         timestamp: Date.now()
       });
 
@@ -415,13 +422,26 @@ io.on("connection", (socket) => {
     if (!target || target.eliminated) return;
 
     voter.hasVoted = true;
+    voter.votedFor = targetPlayer; // Guardar a quién votó
+    
+    // Estructurar votos de manera más detallada
+    if (!roomData.voteDetails) {
+      roomData.voteDetails = [];
+    }
+    roomData.voteDetails.push({
+      voter: voter.name,
+      target: targetPlayer,
+      timestamp: Date.now()
+    });
+    
     roomData.votes[targetPlayer] = (roomData.votes[targetPlayer] || 0) + 1;
 
     io.to(room).emit('voteUpdate', {
       voter: voter.name,
       target: targetPlayer,
-      totalVotes: Object.keys(roomData.votes).length,
-      requiredVotes: roomData.players.filter(p => !p.eliminated).length
+      totalVotes: roomData.voteDetails.length,
+      requiredVotes: roomData.players.filter(p => !p.eliminated).length,
+      voteDetails: roomData.voteDetails
     });
 
     // Verificar si todos votaron
@@ -492,9 +512,15 @@ io.on("connection", (socket) => {
         roomData.championData = championInfo;
         roomData.impostorIndex = impostorIndex;
         roomData.state = GAME_STATES.DESCRIBING;
-        roomData.currentTurn = 0;
         roomData.votes = {};
         roomData.round++;
+
+        // Encontrar el primer jugador vivo
+        let firstAliveIndex = 0;
+        while (firstAliveIndex < roomData.players.length && roomData.players[firstAliveIndex].eliminated) {
+          firstAliveIndex++;
+        }
+        roomData.currentTurn = firstAliveIndex;
 
         // Enviar roles a cada jugador
         roomData.players.forEach(player => {
@@ -509,14 +535,14 @@ io.on("connection", (socket) => {
         // Enviar estado inicial del juego
         io.to(room).emit('gameStateUpdate', {
           state: GAME_STATES.DESCRIBING,
-          currentPlayer: roomData.players[0].name,
+          currentPlayer: roomData.players[roomData.currentTurn].name,
           round: roomData.round,
           champion: null
         });
 
         io.to(room).emit('chatMessage', {
           type: 'system',
-          message: `¡Nueva partida iniciada! Ronda ${roomData.round}. Es el turno de ${roomData.players[0].name} para describir.`,
+          message: `¡Nueva partida iniciada! Ronda ${roomData.round}. Es el turno de ${roomData.players[roomData.currentTurn].name} para describir.`,
           timestamp: Date.now()
         });
 
@@ -600,9 +626,19 @@ function nextTurn(room) {
     clearTimeout(roomData.timer);
   }
 
-  // Buscar el siguiente jugador que no haya sido eliminado
+  // Buscar el siguiente jugador vivo
   const alivePlayers = roomData.players.filter(p => !p.eliminated);
-  roomData.currentTurn = (roomData.currentTurn + 1) % alivePlayers.length;
+  
+  // Encontrar el siguiente jugador vivo después del currentTurn actual
+  let nextTurnIndex = roomData.currentTurn;
+  let attempts = 0;
+  
+  do {
+    nextTurnIndex = (nextTurnIndex + 1) % roomData.players.length;
+    attempts++;
+  } while (roomData.players[nextTurnIndex].eliminated && attempts < roomData.players.length);
+  
+  roomData.currentTurn = nextTurnIndex;
 
   // Verificar si todos los jugadores vivos han descrito
   const playersWhoDescribed = alivePlayers.filter(p => p.hasDescribed).length;
@@ -612,7 +648,7 @@ function nextTurn(room) {
     startDebatePhase(room);
   } else {
     // Continuar con el siguiente turno
-    const nextPlayer = alivePlayers[roomData.currentTurn];
+    const nextPlayer = roomData.players[roomData.currentTurn];
     
     io.to(room).emit('gameStateUpdate', {
       state: GAME_STATES.DESCRIBING,
@@ -656,10 +692,12 @@ function startVotingPhase(room) {
   const roomData = rooms[room];
   roomData.state = GAME_STATES.VOTING;
   roomData.votes = {};
+  roomData.voteDetails = []; // Limpiar detalles de votos anteriores
 
   // Resetear votos
   roomData.players.forEach(player => {
     player.hasVoted = false;
+    player.votedFor = null; // Limpiar voto anterior
   });
 
   const alivePlayers = roomData.players.filter(p => !p.eliminated);
@@ -719,6 +757,7 @@ function processVoteResults(room) {
     eliminatedPlayer: eliminatedPlayer ? eliminatedPlayer.name : null,
     wasImpostor: eliminatedPlayer ? eliminatedPlayer.impostor : false,
     votes: roomData.votes,
+    voteDetails: roomData.voteDetails || [],
     message: resultMessage
   });
 
@@ -750,21 +789,27 @@ function startNextRound(room) {
   });
   
   roomData.state = GAME_STATES.DESCRIBING;
-  roomData.currentTurn = 0;
   roomData.votes = {};
   roomData.round++;
 
-  const alivePlayers = roomData.players.filter(p => !p.eliminated);
+  // Encontrar el primer jugador vivo para empezar la ronda
+  let firstAliveIndex = 0;
+  while (firstAliveIndex < roomData.players.length && roomData.players[firstAliveIndex].eliminated) {
+    firstAliveIndex++;
+  }
+  
+  roomData.currentTurn = firstAliveIndex;
+  const firstPlayer = roomData.players[firstAliveIndex];
 
   io.to(room).emit('gameStateUpdate', {
     state: GAME_STATES.DESCRIBING,
-    currentPlayer: alivePlayers[0].name,
+    currentPlayer: firstPlayer.name,
     round: roomData.round
   });
 
   io.to(room).emit('chatMessage', {
     type: 'system',
-    message: `¡Nueva ronda ${roomData.round}! Es el turno de ${alivePlayers[0].name} para describir.`,
+    message: `¡Nueva ronda ${roomData.round}! Es el turno de ${firstPlayer.name} para describir.`,
     timestamp: Date.now()
   });
 

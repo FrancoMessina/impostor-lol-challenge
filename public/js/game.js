@@ -72,6 +72,31 @@ function formatTime(seconds) {
   return seconds.toString().padStart(2, '0');
 }
 
+function formatTimestamp(timestamp) {
+  const date = new Date(timestamp);
+  const now = new Date();
+  
+  // Si es del mismo día, mostrar solo hora
+  if (date.toDateString() === now.toDateString()) {
+    return date.toLocaleTimeString('es-ES', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    });
+  } else {
+    // Si es de otro día, mostrar fecha y hora
+    return date.toLocaleString('es-ES', {
+      day: '2-digit',
+      month: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    });
+  }
+}
+
 function showAlert(type, message) {
   const alertElement = type === 'error' ? elements.errorAlert : elements.successAlert;
   const messageElement = type === 'error' ? elements.errorMessage : elements.successMessage;
@@ -610,19 +635,19 @@ function addChatMessage(messageData) {
   if (messageData.type === 'system') {
     messageHTML = `
       <div class="message-content">${messageData.message}</div>
-      <div class="message-time">${new Date(messageData.timestamp).toLocaleTimeString()}</div>
+      <div class="message-time">${formatTimestamp(messageData.timestamp)}</div>
     `;
   } else if (messageData.type === 'description') {
     messageHTML = `
       <div class="message-header">${messageData.playerName} describe:</div>
       <div class="message-content">"${messageData.message}"</div>
-      <div class="message-time">${new Date(messageData.timestamp).toLocaleTimeString()}</div>
+      <div class="message-time">${formatTimestamp(messageData.timestamp)}</div>
     `;
   } else {
     messageHTML = `
       <div class="message-header">${messageData.playerName}:</div>
       <div class="message-content">${messageData.message}</div>
-      <div class="message-time">${new Date(messageData.timestamp).toLocaleTimeString()}</div>
+      <div class="message-time">${formatTimestamp(messageData.timestamp)}</div>
     `;
   }
   
@@ -869,10 +894,21 @@ socket.on('timerUpdate', ({ duration, startTime }) => {
 
 socket.on('voteUpdate', (voteData) => {
   console.log('🗳️ Actualización de votos:', voteData);
-  elements.voteStatus.innerHTML = `
-    <small>Votos: ${voteData.totalVotes}/${voteData.requiredVotes}</small>
-    <small>Último voto: ${voteData.voter} → ${voteData.target}</small>
-  `;
+  
+  let voteDetailsHTML = `<small>Votos: ${voteData.totalVotes}/${voteData.requiredVotes}</small>`;
+  
+  if (voteData.voteDetails && voteData.voteDetails.length > 0) {
+    voteDetailsHTML += `<div style="margin-top: 8px; font-size: 0.75rem; color: var(--lol-accent);">`;
+    voteDetailsHTML += `<strong>Detalles de votación:</strong><br>`;
+    
+    voteData.voteDetails.forEach(vote => {
+      voteDetailsHTML += `${vote.voter} → ${vote.target}<br>`;
+    });
+    
+    voteDetailsHTML += `</div>`;
+  }
+  
+  elements.voteStatus.innerHTML = voteDetailsHTML;
 });
 
 socket.on('voteResults', (resultsData) => {
@@ -884,10 +920,22 @@ socket.on('voteResults', (resultsData) => {
     </div>
   `;
   
-  if (resultsData.votes && Object.keys(resultsData.votes).length > 0) {
-    resultHTML += '<div style="margin-top: 1rem;"><strong>Resultados de la votación:</strong></div>';
-    for (const [player, votes] of Object.entries(resultsData.votes)) {
-      resultHTML += `<div>${player}: ${votes} voto${votes !== 1 ? 's' : ''}</div>`;
+  if (resultsData.voteDetails && resultsData.voteDetails.length > 0) {
+    resultHTML += '<div style="margin-top: 1rem;"><strong>Detalles de la votación:</strong></div>';
+    resultHTML += '<div style="background: rgba(30, 60, 114, 0.2); border-radius: 8px; padding: 12px; margin: 8px 0; font-size: 0.9rem;">';
+    
+    resultsData.voteDetails.forEach(vote => {
+      resultHTML += `<div style="margin-bottom: 4px;">🗳️ <strong>${vote.voter}</strong> votó por <strong>${vote.target}</strong></div>`;
+    });
+    
+    resultHTML += '</div>';
+    
+    // Mostrar resumen de votos
+    if (resultsData.votes && Object.keys(resultsData.votes).length > 0) {
+      resultHTML += '<div style="margin-top: 0.5rem;"><strong>Resumen:</strong></div>';
+      for (const [player, votes] of Object.entries(resultsData.votes)) {
+        resultHTML += `<div style="font-size: 0.85rem;">📊 ${player}: ${votes} voto${votes !== 1 ? 's' : ''}</div>`;
+      }
     }
   }
   
