@@ -578,10 +578,26 @@ function handleDebatingPhase() {
 function handleVotingPhase(phaseData) {
   elements.votingSection.style.display = 'block';
   
+  // Verificar si el jugador actual está eliminado
+  const currentPlayer = gameState.players.find(p => p.name === gameState.playerName);
+  const isEliminated = currentPlayer && currentPlayer.eliminated;
+  
   if (phaseData.candidates) {
-    createVotingButtons(phaseData.candidates);
-    showAlert('success', '¡Tiempo de votar! Selecciona a quien crees que es el impostor.');
-    playNotificationSound();
+    if (isEliminated) {
+      // Si está eliminado, mostrar mensaje en lugar de botones
+      elements.votingButtons.innerHTML = `
+        <div style="text-align: center; padding: 2rem; background: rgba(220, 38, 38, 0.1); border: 2px solid #DC2626; border-radius: 15px; color: #DC2626;">
+          <i class="fas fa-times-circle" style="font-size: 2rem; margin-bottom: 1rem;"></i>
+          <h4>Has sido eliminado</h4>
+          <p>No puedes votar en esta ronda. Observa cómo termina la partida.</p>
+        </div>
+      `;
+      showAlert('info', 'Has sido eliminado y no puedes votar.');
+    } else {
+      createVotingButtons(phaseData.candidates);
+      showAlert('success', '¡Tiempo de votar! Selecciona a quien crees que es el impostor.');
+      playNotificationSound();
+    }
   }
 }
 
@@ -608,6 +624,13 @@ function createVotingButtons(candidates) {
 
 function vote(targetPlayer) {
   if (gameState.hasVoted) return;
+  
+  // Verificar si el jugador está eliminado
+  const currentPlayer = gameState.players.find(p => p.name === gameState.playerName);
+  if (currentPlayer && currentPlayer.eliminated) {
+    showAlert('error', 'No puedes votar porque has sido eliminado.');
+    return;
+  }
   
   socket.emit('vote', { 
     room: gameState.currentRoom, 
