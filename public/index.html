@@ -298,7 +298,7 @@
         
         <div class="mb-3">
           <label for="max-players" class="form-label">Máximo de Jugadores</label>
-          <select id="max-players" class="form-select lol-input">
+          <select id="max-players" class="form-select lol-input" onchange="updateImpostorOptions()">
             <option value="3">3 jugadores</option>
             <option value="4">4 jugadores</option>
             <option value="5">5 jugadores</option>
@@ -306,6 +306,20 @@
             <option value="7">7 jugadores</option>
             <option value="8">8 jugadores</option>
           </select>
+        </div>
+        
+        <div class="mb-3">
+          <label for="num-impostors" class="form-label">
+            Número de Impostores 
+            <small class="text-muted">(recomendado automáticamente)</small>
+          </label>
+          <select id="num-impostors" class="form-select lol-input">
+            <option value="1" selected>1 impostor</option>
+            <option value="2">2 impostores</option>
+          </select>
+          <small class="form-text text-muted">
+            📊 Más impostores = juego más difícil para investigadores
+          </small>
         </div>
         
         <div class="mb-3">

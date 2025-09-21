@@ -70,7 +70,7 @@ function initializeRoom(roomCode, creatorId, roomData = {}) {
     state: GAME_STATES.LOBBY,
     champion: null,
     championData: null,
-    impostorIndex: -1,
+    impostorIndices: [], // Array para múltiples impostores
     currentTurn: 0,
     turnStartTime: null,
     timer: null,
@@ -85,11 +85,29 @@ function initializeRoom(roomCode, creatorId, roomData = {}) {
     name: roomData.name || `Sala de ${roomData.creatorName || 'Anónimo'}`,
     isPublic: roomData.isPublic !== false, // Por defecto público
     maxPlayers: roomData.maxPlayers || 6,
+    numImpostors: roomData.numImpostors || getRecommendedImpostors(roomData.maxPlayers || 6),
     createdAt: Date.now(),
     lastActivity: Date.now(),
     creatorName: roomData.creatorName || 'Anónimo'
   };
 }
+
+// Función helper para recomendar número de impostores según jugadores
+function getRecommendedImpostors(maxPlayers) {
+  if (maxPlayers <= 4) return 1;
+  if (maxPlayers <= 6) return 1; // Por defecto 1, pero se puede configurar 2
+  return 2; // 7-8 jugadores, recomendar 2
+}
+
+// Validar que el número de impostores sea apropiado
+function validateImpostorCount(numPlayers, numImpostors) {
+  if (numImpostors < 1) return false;
+  if (numPlayers <= 3) return numImpostors === 1; // 3 jugadores: solo 1 impostor
+  if (numPlayers <= 4) return numImpostors <= 1; // 4 jugadores: máximo 1
+  if (numPlayers <= 8) return numImpostors <= 2; // 5-8 jugadores: máximo 2
+  return numImpostors <= Math.floor(numPlayers / 3); // Regla general: máximo 1/3
+}
+
 
 function getPlayerById(room, socketId) {
   return rooms[room].players.find(p => p.id === socketId);
@@ -106,16 +124,16 @@ function getRoomBySocket(socketId) {
 
 function checkGameEnd(room) {
   const roomData = rooms[room];
-  const alivePlayers = roomData.players.filter(p => !p.eliminated);
+  const alivePlayers = roomData.players.filter(p => !p.eliminated && !p.disconnected);
   const aliveImpostors = alivePlayers.filter(p => p.impostor);
   const aliveInvestigators = alivePlayers.filter(p => !p.impostor);
   
-  // Impostor gana si hay igual cantidad de impostores e investigadores
-  if (aliveImpostors.length >= aliveInvestigators.length) {
+  // Impostores ganan si son >= investigadores (y hay al menos 1 impostor vivo)
+  if (aliveImpostors.length >= aliveInvestigators.length && aliveImpostors.length > 0) {
     return { ended: true, winner: 'impostor' };
   }
   
-  // Investigadores ganan si eliminaron a todos los impostores
+  // Investigadores ganan si eliminaron a TODOS los impostores
   if (aliveImpostors.length === 0) {
     return { ended: true, winner: 'investigators' };
   }
@@ -332,12 +350,24 @@ io.on("connection", (socket) => {
         key: selectedChampionKey
       };
       
-      // Mezclar jugadores y asignar impostor
+      // Validar número de impostores para los jugadores actuales
+      const currentPlayers = roomData.players.filter(p => !p.disconnected);
+      if (!validateImpostorCount(currentPlayers.length, roomData.numImpostors)) {
+        // Ajustar automáticamente si la configuración no es válida
+        roomData.numImpostors = getRecommendedImpostors(currentPlayers.length);
+      }
+      
+      // Mezclar jugadores y asignar impostores
       let shuffledPlayers = [...roomData.players].sort(() => Math.random() - 0.5);
-      const impostorIndex = 0; // El primer jugador mezclado será el impostor
+      
+      // Seleccionar múltiples impostores
+      const impostorIndices = [];
+      for (let i = 0; i < roomData.numImpostors && i < shuffledPlayers.length; i++) {
+        impostorIndices.push(i);
+      }
       
       shuffledPlayers.forEach((player, index) => {
-        player.impostor = index === impostorIndex;
+        player.impostor = impostorIndices.includes(index);
         player.eliminated = false;
         player.hasVoted = false;
         player.hasDescribed = false;
@@ -346,7 +376,7 @@ io.on("connection", (socket) => {
       roomData.players = shuffledPlayers;
       roomData.champion = championInfo.name;
       roomData.championData = championInfo; // Guardar datos completos del campeón
-      roomData.impostorIndex = impostorIndex;
+      roomData.impostorIndices = impostorIndices;
       roomData.state = GAME_STATES.DESCRIBING;
       roomData.votes = {};
       roomData.round++;
@@ -521,12 +551,24 @@ io.on("connection", (socket) => {
           key: selectedChampionKey
         };
         
-        // Mezclar jugadores y asignar impostor
+        // Validar número de impostores para los jugadores actuales
+        const currentPlayers = roomData.players.filter(p => !p.disconnected);
+        if (!validateImpostorCount(currentPlayers.length, roomData.numImpostors)) {
+          // Ajustar automáticamente si la configuración no es válida
+          roomData.numImpostors = getRecommendedImpostors(currentPlayers.length);
+        }
+        
+        // Mezclar jugadores y asignar impostores
         let shuffledPlayers = [...roomData.players].sort(() => Math.random() - 0.5);
-        const impostorIndex = 0; // El primer jugador mezclado será el impostor
+        
+        // Seleccionar múltiples impostores
+        const impostorIndices = [];
+        for (let i = 0; i < roomData.numImpostors && i < shuffledPlayers.length; i++) {
+          impostorIndices.push(i);
+        }
         
         shuffledPlayers.forEach((player, index) => {
-          player.impostor = index === impostorIndex;
+          player.impostor = impostorIndices.includes(index);
           player.eliminated = false;
           player.hasVoted = false;
           player.hasDescribed = false;
@@ -535,7 +577,7 @@ io.on("connection", (socket) => {
         roomData.players = shuffledPlayers;
         roomData.champion = championInfo.name;
         roomData.championData = championInfo;
-        roomData.impostorIndex = impostorIndex;
+        roomData.impostorIndices = impostorIndices;
         roomData.state = GAME_STATES.DESCRIBING;
         roomData.votes = {};
         roomData.round++;
@@ -567,7 +609,7 @@ io.on("connection", (socket) => {
 
         io.to(room).emit('chatMessage', {
           type: 'system',
-          message: `¡Nueva partida iniciada! Ronda ${roomData.round}. Es el turno de ${roomData.players[roomData.currentTurn].name} para describir.`,
+          message: `¡Nueva partida iniciada! Ronda ${roomData.round} con ${roomData.numImpostors} impostor${roomData.numImpostors > 1 ? 'es' : ''}. Es el turno de ${roomData.players[roomData.currentTurn].name} para describir.`,
           timestamp: Date.now()
         });
 
@@ -855,9 +897,12 @@ function endGame(room, winner) {
     clearTimeout(roomData.timer);
   }
 
+  const impostorPlayers = roomData.players.filter(p => p.impostor);
+  const impostorNames = impostorPlayers.map(p => p.name).join(', ');
+  
   const winMessage = winner === 'impostor' 
-    ? '🔥 El IMPOSTOR ha ganado! Logró sobrevivir y engañar a todos!' 
-    : '🏆 Los INVESTIGADORES han ganado! Eliminaron al impostor!';
+    ? `🔥 ${roomData.numImpostors > 1 ? 'Los IMPOSTORES han ganado' : 'El IMPOSTOR ha ganado'}! ${roomData.numImpostors > 1 ? 'Lograron' : 'Logró'} sobrevivir y engañar a todos!` 
+    : `🏆 Los INVESTIGADORES han ganado! Eliminaron ${roomData.numImpostors > 1 ? 'a todos los impostores' : 'al impostor'}!`;
 
   // Calcular y asignar puntos
   const impostorPlayer = roomData.players.find(p => p.impostor);
@@ -901,7 +946,9 @@ function endGame(room, winner) {
     message: winMessage,
     champion: roomData.champion,
     championData: roomData.championData,
-    impostor: impostorPlayer.name,
+    impostor: impostorPlayer.name, // Para compatibilidad
+    impostors: impostorNames, // Lista de todos los impostores
+    numImpostors: roomData.numImpostors,
     scores: roomData.players.map(p => ({
       name: p.name,
       score: p.score,
@@ -914,7 +961,7 @@ function endGame(room, winner) {
 
   io.to(room).emit('chatMessage', {
     type: 'system',
-    message: `${winMessage} El campeón era: ${roomData.champion}`,
+    message: `${winMessage} ${roomData.numImpostors > 1 ? 'Los impostores eran:' : 'El impostor era:'} ${impostorNames}. El campeón era: ${roomData.champion}`,
     timestamp: Date.now()
   });
 
@@ -951,6 +998,7 @@ app.get('/api/rooms', (req, res) => {
       name: room.name,
       players: room.players.length,
       maxPlayers: room.maxPlayers,
+      numImpostors: room.numImpostors,
       state: room.state,
       createdAt: room.createdAt,
       creatorName: room.creatorName,
@@ -968,7 +1016,7 @@ app.get('/api/rooms', (req, res) => {
 
 // Crear sala con nombre personalizado
 app.post('/api/rooms', (req, res) => {
-  const { name, isPublic = true, maxPlayers = 6, creatorName = 'Anónimo' } = req.body;
+  const { name, isPublic = true, maxPlayers = 6, numImpostors, creatorName = 'Anónimo' } = req.body;
   
   if (!name || name.trim().length < 1) {
     return res.status(400).json({ error: 'El nombre de la sala es requerido' });
@@ -982,6 +1030,17 @@ app.post('/api/rooms', (req, res) => {
     return res.status(400).json({ error: 'El número de jugadores debe estar entre 3 y 8' });
   }
   
+  // Validar o ajustar número de impostores
+  const finalNumImpostors = numImpostors !== undefined ? 
+    Math.max(1, Math.min(numImpostors, Math.floor(maxPlayers / 2))) : 
+    getRecommendedImpostors(maxPlayers);
+    
+  if (!validateImpostorCount(maxPlayers, finalNumImpostors)) {
+    return res.status(400).json({ 
+      error: `Configuración inválida: ${finalNumImpostors} impostor(es) para ${maxPlayers} jugadores` 
+    });
+  }
+  
   // Generar código único
   let roomCode;
   do {
@@ -993,6 +1052,7 @@ app.post('/api/rooms', (req, res) => {
     name: name.trim(),
     isPublic,
     maxPlayers,
+    numImpostors: finalNumImpostors,
     creatorName: creatorName.trim() || 'Anónimo'
   });
   

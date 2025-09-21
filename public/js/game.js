@@ -38,6 +38,7 @@ const elements = {
   createRoomModal: document.getElementById('create-room-modal'),
   customRoomName: document.getElementById('custom-room-name'),
   maxPlayersSelect: document.getElementById('max-players'),
+  numImpostorsSelect: document.getElementById('num-impostors'),
   isPublicCheckbox: document.getElementById('is-public'),
   
   // Game elements
@@ -1028,7 +1029,7 @@ socket.on('gameEnd', (endData) => {
   endHTML += `
       </div>
       <div style="margin-top: 1rem; color: var(--lol-accent);">
-        <strong>El impostor era:</strong> ${endData.impostor}
+        <strong>${endData.numImpostors > 1 ? 'Los impostores eran:' : 'El impostor era:'}</strong> ${endData.impostors || endData.impostor}
       </div>
     </div>
   `;
@@ -1046,8 +1047,9 @@ socket.on('gameEnd', (endData) => {
     
     sortedScores.forEach((player, index) => {
       const rankEmoji = ['🥇', '🥈', '🥉'][index] || '🏅';
-      const isWinner = (endData.winner === 'impostor' && endData.impostor === player.name) ||
-                      (endData.winner === 'investigators' && endData.impostor !== player.name);
+      const isImpostor = endData.impostors ? endData.impostors.includes(player.name) : endData.impostor === player.name;
+      const isWinner = (endData.winner === 'impostor' && isImpostor) ||
+                      (endData.winner === 'investigators' && !isImpostor);
       
       endHTML += `
         <div class="score-summary-item ${isWinner ? 'winner' : ''}">
@@ -1222,6 +1224,10 @@ function displayRooms(rooms) {
               <span class="room-players">${room.players}/${room.maxPlayers}</span>
             </div>
             <div class="room-detail">
+              <i class="fas fa-user-secret"></i>
+              <span>${room.numImpostors} impostor${room.numImpostors > 1 ? 'es' : ''}</span>
+            </div>
+            <div class="room-detail">
               <i class="fas fa-crown"></i>
               <span>${escapeHtml(room.creatorName)}</span>
             </div>
@@ -1271,6 +1277,10 @@ function showCreateCustomRoomModal() {
   
   // Pre-llenar nombre de la sala
   elements.customRoomName.value = `Sala de ${playerName}`;
+  
+  // Inicializar opciones de impostores
+  updateImpostorOptions();
+  
   elements.createRoomModal.style.display = 'flex';
   elements.customRoomName.focus();
   elements.customRoomName.select();
@@ -1283,6 +1293,7 @@ function closeCreateRoomModal() {
 async function createCustomRoom() {
   const roomName = elements.customRoomName.value.trim();
   const maxPlayers = parseInt(elements.maxPlayersSelect.value);
+  const numImpostors = parseInt(elements.numImpostorsSelect.value);
   const isPublic = elements.isPublicCheckbox.checked;
   const playerName = elements.playerNameInput.value.trim();
   
@@ -1305,6 +1316,7 @@ async function createCustomRoom() {
       body: JSON.stringify({
         name: roomName,
         maxPlayers: maxPlayers,
+        numImpostors: numImpostors,
         isPublic: isPublic,
         creatorName: playerName
       })
@@ -1330,6 +1342,34 @@ async function createCustomRoom() {
 
 function refreshRoomList() {
   loadPublicRooms();
+}
+
+// Actualizar opciones de impostores según jugadores
+function updateImpostorOptions() {
+  const maxPlayers = parseInt(elements.maxPlayersSelect.value);
+  const numImpostorsSelect = elements.numImpostorsSelect;
+  const currentValue = parseInt(numImpostorsSelect.value);
+  
+  // Limpiar opciones
+  numImpostorsSelect.innerHTML = '';
+  
+  // Lógica para determinar opciones válidas
+  if (maxPlayers <= 4) {
+    // 3-4 jugadores: solo 1 impostor
+    numImpostorsSelect.innerHTML = '<option value="1" selected>1 impostor</option>';
+  } else if (maxPlayers <= 6) {
+    // 5-6 jugadores: 1 o 2 impostores
+    numImpostorsSelect.innerHTML = `
+      <option value="1" ${currentValue === 1 ? 'selected' : ''}>1 impostor (recomendado)</option>
+      <option value="2" ${currentValue === 2 ? 'selected' : ''}>2 impostores (difícil)</option>
+    `;
+  } else {
+    // 7-8 jugadores: 1 o 2 impostores, recomendado 2
+    numImpostorsSelect.innerHTML = `
+      <option value="1" ${currentValue === 1 ? 'selected' : ''}>1 impostor (fácil)</option>
+      <option value="2" ${currentValue === 2 || currentValue > 2 ? 'selected' : ''}>2 impostores (recomendado)</option>
+    `;
+  }
 }
 
 // Funciones helper
@@ -1376,3 +1416,4 @@ window.showCreateCustomRoomModal = showCreateCustomRoomModal;
 window.closeCreateRoomModal = closeCreateRoomModal;
 window.createCustomRoom = createCustomRoom;
 window.joinPublicRoom = joinPublicRoom;
+window.updateImpostorOptions = updateImpostorOptions;
