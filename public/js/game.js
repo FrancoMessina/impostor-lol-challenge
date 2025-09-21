@@ -133,12 +133,130 @@ function joinRoom() {
   gameState.playerName = playerName;
   gameState.currentRoom = roomCode.toUpperCase();
   
+  // Guardar información de sesión para reconexión
+  saveSessionData();
+  
   socket.emit('joinRoom', { 
     name: playerName, 
     room: gameState.currentRoom 
   });
   
   showAlert('success', `Conectando a la sala ${gameState.currentRoom}...`);
+}
+
+function saveSessionData() {
+  try {
+    localStorage.setItem('lolImpostorSession', JSON.stringify({
+      playerName: gameState.playerName,
+      currentRoom: gameState.currentRoom,
+      timestamp: Date.now()
+    }));
+  } catch (error) {
+    console.warn('No se pudo guardar la sesión:', error);
+  }
+}
+
+function loadSessionData() {
+  try {
+    const sessionData = localStorage.getItem('lolImpostorSession');
+    if (sessionData) {
+      const data = JSON.parse(sessionData);
+      // Solo cargar si es de las últimas 2 horas
+      if (Date.now() - data.timestamp < 2 * 60 * 60 * 1000) {
+        return data;
+      }
+    }
+  } catch (error) {
+    console.warn('No se pudo cargar la sesión:', error);
+  }
+  return null;
+}
+
+function clearSessionData() {
+  try {
+    localStorage.removeItem('lolImpostorSession');
+  } catch (error) {
+    console.warn('No se pudo limpiar la sesión:', error);
+  }
+}
+
+function attemptReconnection() {
+  const sessionData = loadSessionData();
+  if (sessionData && sessionData.playerName && sessionData.currentRoom) {
+    // Mostrar botón de reconexión
+    showReconnectionDialog(sessionData);
+  }
+}
+
+function showReconnectionDialog(sessionData) {
+  const reconnectHTML = `
+    <div id="reconnect-dialog" style="
+      position: fixed; 
+      top: 50%; 
+      left: 50%; 
+      transform: translate(-50%, -50%); 
+      z-index: 10000; 
+      background: var(--bg-card); 
+      border: var(--border-gold); 
+      border-radius: 15px; 
+      padding: 2rem; 
+      max-width: 400px;
+      box-shadow: var(--shadow-gold);
+      text-align: center;
+    ">
+      <div style="margin-bottom: 1rem;">
+        <i class="fas fa-wifi" style="font-size: 3rem; color: var(--lol-gold);"></i>
+      </div>
+      <h3 style="color: var(--lol-gold); margin-bottom: 1rem;">¿Reconectar?</h3>
+      <p style="color: var(--lol-accent); margin-bottom: 1.5rem;">
+        Se detectó una sesión anterior:<br>
+        <strong>${sessionData.playerName}</strong> en sala <strong>${sessionData.currentRoom}</strong>
+      </p>
+      <div style="display: flex; gap: 10px; justify-content: center;">
+        <button class="btn btn-lol btn-warning" onclick="doReconnect('${sessionData.playerName}', '${sessionData.currentRoom}')">
+          <i class="fas fa-plug"></i> Reconectar
+        </button>
+        <button class="btn btn-lol btn-secondary" onclick="closeReconnectDialog()">
+          <i class="fas fa-times"></i> Nueva Sesión
+        </button>
+      </div>
+    </div>
+    <div id="reconnect-overlay" style="
+      position: fixed; 
+      top: 0; 
+      left: 0; 
+      width: 100%; 
+      height: 100%; 
+      background: rgba(0, 0, 0, 0.7); 
+      z-index: 9999;
+    "></div>
+  `;
+  
+  document.body.insertAdjacentHTML('beforeend', reconnectHTML);
+}
+
+function doReconnect(playerName, roomCode) {
+  gameState.playerName = playerName;
+  gameState.currentRoom = roomCode;
+  
+  elements.playerNameInput.value = playerName;
+  elements.roomCodeInput.value = roomCode;
+  
+  socket.emit('rejoinRoom', { 
+    name: playerName, 
+    room: roomCode 
+  });
+  
+  closeReconnectDialog();
+  showAlert('success', 'Intentando reconectar...');
+}
+
+function closeReconnectDialog() {
+  const dialog = document.getElementById('reconnect-dialog');
+  const overlay = document.getElementById('reconnect-overlay');
+  if (dialog) dialog.remove();
+  if (overlay) overlay.remove();
+  clearSessionData();
 }
 
 function startGame() {
@@ -189,6 +307,26 @@ function restartGame() {
   }, 1000);
 }
 
+function goBackToLobby() {
+  if (confirm('¿Estás seguro de que quieres volver al lobby? Esto te desconectará del juego actual.')) {
+    location.reload();
+  }
+}
+
+function rejoinGame() {
+  const name = gameState.playerName;
+  const room = gameState.currentRoom;
+  
+  if (!name || !room) {
+    showAlert('error', 'No se puede reconectar: datos de sesión perdidos');
+    return;
+  }
+  
+  // Intentar reconectarse
+  socket.emit('rejoinRoom', { name, room });
+  showAlert('success', 'Intentando reconectar...');
+}
+
 function updatePlayersDisplay(playersData) {
   const { players, canStart, creatorId } = playersData;
   
@@ -203,23 +341,27 @@ function updatePlayersDisplay(playersData) {
   // Actualizar grid de jugadores
   const slots = elements.playersGrid.querySelectorAll('.empty-slot, .player-slot');
   
-  slots.forEach((slot, index) => {
-    if (players[index]) {
-      slot.className = 'player-slot';
-      let playerText = players[index].name;
-      if (players[index].isCreator) {
-        playerText += ' 👑';
+    slots.forEach((slot, index) => {
+      if (players[index]) {
+        slot.className = 'player-slot';
+        let playerText = players[index].name;
+        if (players[index].isCreator) {
+          playerText += ' 👑';
+        }
+        if (players[index].disconnected) {
+          playerText += ' 📱';
+          slot.classList.add('disconnected');
+        }
+        slot.textContent = playerText;
+        
+        if (players[index].eliminated) {
+          slot.classList.add('eliminated');
+        }
+      } else {
+        slot.className = 'empty-slot';
+        slot.textContent = 'Esperando jugador...';
       }
-      slot.textContent = playerText;
-      
-      if (players[index].eliminated) {
-        slot.classList.add('eliminated');
-      }
-    } else {
-      slot.className = 'empty-slot';
-      slot.textContent = 'Esperando jugador...';
-    }
-  });
+    });
   
   // Actualizar scoreboard
   updateScoreboard(players);
@@ -457,8 +599,10 @@ function addChatMessage(messageData) {
   const messageDiv = document.createElement('div');
   messageDiv.className = `chat-message ${messageData.type}`;
   
-  if (messageData.impostor && messageData.type === 'player') {
-    messageDiv.className += ' impostor';
+  // Solo mostrar color especial del impostor si el mensaje es del jugador actual y es impostor
+  if (messageData.impostor && messageData.type === 'player' && 
+      messageData.playerName === gameState.playerName && gameState.isImpostor) {
+    messageDiv.className += ' my-impostor';
   }
   
   let messageHTML = '';
@@ -652,6 +796,11 @@ function updateGamePlayersList(players) {
 document.addEventListener('DOMContentLoaded', function() {
   console.log('🎮 LOL Impostor cargado');
   
+  // Intentar reconexión automática
+  setTimeout(() => {
+    attemptReconnection();
+  }, 1000);
+  
   // Eventos de teclado
   elements.playerNameInput?.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') joinRoom();
@@ -817,42 +966,51 @@ socket.on('gameEnd', (endData) => {
     `;
   }
   
-  // Mostrar controles de reinicio - solo para el líder
+  // Mostrar controles de reinicio - MUY VISIBLE para el líder
+  endHTML += `<div style="margin-top: 2rem; padding: 1.5rem; background: rgba(30, 60, 114, 0.2); border-radius: 15px; border: 2px solid var(--lol-gold);">`;
+  
   if (endData.canRestart && gameState.isCreator) {
     endHTML += `
-      <div style="margin-top: 1.5rem; text-align: center;">
-        <div style="margin-bottom: 1rem; color: var(--lol-gold); font-weight: 600;">
-          <i class="fas fa-crown"></i> Como líder, puedes iniciar otra partida
+      <div style="text-align: center;">
+        <div style="margin-bottom: 1.5rem;">
+          <i class="fas fa-crown" style="color: var(--lol-gold); font-size: 2rem; margin-bottom: 10px;"></i>
+          <h4 style="color: var(--lol-gold); margin: 0;">¡Eres el Líder de la Sala!</h4>
+          <p style="color: var(--lol-accent); margin: 5px 0 0 0;">Puedes iniciar otra partida o cerrar la sala</p>
         </div>
-        <button class="btn btn-lol btn-warning" onclick="restartGame()" style="margin-right: 10px;">
-          <i class="fas fa-play"></i> Nueva Partida
-        </button>
-        <button class="btn btn-lol btn-secondary" onclick="location.reload()">
-          <i class="fas fa-sign-out-alt"></i> Salir al Lobby
-        </button>
+        <div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
+          <button class="btn btn-lol btn-warning btn-lg" onclick="restartGame()" style="min-width: 180px;">
+            <i class="fas fa-play"></i> ¡NUEVA PARTIDA!
+          </button>
+          <button class="btn btn-lol btn-secondary" onclick="goBackToLobby()">
+            <i class="fas fa-sign-out-alt"></i> Salir al Lobby
+          </button>
+        </div>
       </div>
     `;
   } else if (endData.canRestart) {
     endHTML += `
-      <div style="margin-top: 1.5rem; text-align: center;">
-        <div class="waiting-for-leader-restart">
+      <div style="text-align: center;">
+        <div class="waiting-for-leader-restart" style="margin-bottom: 1rem;">
           <i class="fas fa-hourglass-half"></i> 
           Esperando a que <strong>${endData.creatorName}</strong> 👑 inicie otra partida...
         </div>
-        <button class="btn btn-lol btn-secondary" onclick="location.reload()" style="margin-top: 10px;">
+        <button class="btn btn-lol btn-secondary" onclick="goBackToLobby()">
           <i class="fas fa-sign-out-alt"></i> Salir al Lobby
         </button>
       </div>
     `;
   } else {
     endHTML += `
-      <div style="margin-top: 1.5rem; text-align: center;">
-        <button class="btn btn-lol btn-warning" onclick="location.reload()">
+      <div style="text-align: center;">
+        <p style="color: var(--lol-accent); margin-bottom: 1rem;">Partida terminada</p>
+        <button class="btn btn-lol btn-warning" onclick="goBackToLobby()">
           <i class="fas fa-redo"></i> Volver al Lobby
         </button>
       </div>
     `;
   }
+  
+  endHTML += `</div>`;
   
   elements.resultContent.innerHTML = endHTML;
   
@@ -881,6 +1039,20 @@ socket.on('gameEnd', (endData) => {
   }, 2000);
 });
 
+socket.on('reconnectSuccess', (data) => {
+  console.log('🔗 Reconexión exitosa:', data);
+  
+  gameState.currentRoom = data.room;
+  gameState.isCreator = data.isCreator;
+  
+  showAlert('success', data.message);
+  
+  // Si hay juego en curso, ir a pantalla de juego
+  if (data.gameState !== 'lobby') {
+    switchToGameScreen();
+  }
+});
+
 // ====== FUNCIONES GLOBALES PARA HTML ====== //
 window.createRoom = createRoom;
 window.joinRoom = joinRoom;
@@ -888,3 +1060,6 @@ window.startGame = startGame;
 window.restartGame = restartGame;
 window.sendMessage = sendMessage;
 window.submitDescription = submitDescription;
+window.goBackToLobby = goBackToLobby;
+window.doReconnect = doReconnect;
+window.closeReconnectDialog = closeReconnectDialog;

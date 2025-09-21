@@ -35,8 +35,8 @@ let rooms = {}; // Estructura completa de las salas
 
 async function getChampions() {
   try {
-    const res = await fetch("https://ddragon.leagueoflegends.com/cdn/14.17.1/data/en_US/champion.json");
-    const data = await res.json();
+  const res = await fetch("https://ddragon.leagueoflegends.com/cdn/14.17.1/data/en_US/champion.json");
+  const data = await res.json();
     return data.data; // Devolver datos completos en lugar de solo nombres
   } catch (error) {
     console.error("Error obteniendo campeones:", error);
@@ -168,7 +168,8 @@ io.on("connection", (socket) => {
       score: 0,
       gamesWon: 0,
       gamesAsImpostor: 0,
-      gamesAsInvestigator: 0
+      gamesAsInvestigator: 0,
+      disconnected: false
     });
 
     socket.join(room);
@@ -179,7 +180,8 @@ io.on("connection", (socket) => {
         name: p.name,
         eliminated: p.eliminated,
         isCreator: p.isCreator,
-        score: p.score
+        score: p.score,
+        disconnected: p.disconnected
       })),
       gameState: roomData.state,
       canStart: roomData.players.length >= 3, // Mínimo 3 para testing
@@ -190,6 +192,82 @@ io.on("connection", (socket) => {
       type: 'system',
       message: `${name} se unió a la sala${isCreator ? ' (Creador)' : ''}`,
       timestamp: Date.now()
+    });
+  });
+
+  // Nuevo evento para reconectar jugadores
+  socket.on('rejoinRoom', ({ name, room }) => {
+    if (!rooms[room]) {
+      socket.emit('error', 'La sala no existe');
+      return;
+    }
+
+    const roomData = rooms[room];
+    const existingPlayer = roomData.players.find(p => p.name === name);
+
+    if (!existingPlayer) {
+      socket.emit('error', 'No se encontró tu jugador en esta sala');
+      return;
+    }
+
+    // Reconectar el jugador
+    existingPlayer.id = socket.id;
+    existingPlayer.disconnected = false;
+    socket.join(room);
+
+    // Si hay un juego en curso, enviar el estado actual
+    if (roomData.state !== GAME_STATES.LOBBY) {
+      // Enviar rol si está en juego
+      socket.emit("roleAssigned", {
+        champion: existingPlayer.impostor ? null : roomData.champion,
+        championData: existingPlayer.impostor ? null : roomData.championData,
+        impostor: existingPlayer.impostor,
+        gameState: roomData.state
+      });
+
+      // Enviar estado del juego
+      socket.emit('gameStateUpdate', {
+        state: roomData.state,
+        currentPlayer: roomData.players[roomData.currentTurn]?.name,
+        round: roomData.round,
+        candidates: roomData.state === GAME_STATES.VOTING ? 
+          roomData.players.filter(p => !p.eliminated).map(p => p.name) : undefined
+      });
+
+      // Enviar temporizador si está activo
+      if (roomData.turnStartTime) {
+        socket.emit('timerUpdate', { 
+          duration: GAME_CONFIG.DESCRIBE_TIME * 1000, 
+          startTime: roomData.turnStartTime 
+        });
+      }
+    }
+
+    // Actualizar a todos los jugadores
+    io.to(room).emit("playersUpdate", {
+      players: roomData.players.map(p => ({
+        name: p.name,
+        eliminated: p.eliminated,
+        isCreator: p.isCreator,
+        score: p.score,
+        disconnected: p.disconnected
+      })),
+      gameState: roomData.state,
+      canStart: roomData.players.length >= 3,
+      creatorId: roomData.creatorId
+    });
+
+    io.to(room).emit('chatMessage', {
+      type: 'system',
+      message: `${name} se reconectó al juego`,
+      timestamp: Date.now()
+    });
+
+    socket.emit('reconnectSuccess', {
+      room: room,
+      gameState: roomData.state,
+      isCreator: existingPlayer.isCreator,
+      message: '¡Reconectado exitosamente!'
     });
   });
 
@@ -461,26 +539,29 @@ io.on("connection", (socket) => {
       const disconnectedPlayer = roomData.players.find(p => p.id === socket.id);
       
       if (disconnectedPlayer) {
-        // Si se desconecta el creador, asignar a otro jugador como creador
-        if (disconnectedPlayer.isCreator && roomData.players.length > 1) {
-          const newCreator = roomData.players.find(p => p.id !== socket.id);
+        // Marcar como desconectado en lugar de eliminar
+        disconnectedPlayer.disconnected = true;
+        disconnectedPlayer.id = null; // Limpiar socket ID
+        
+        // Si se desconecta el creador, asignar a otro jugador conectado como creador
+        if (disconnectedPlayer.isCreator) {
+          const newCreator = roomData.players.find(p => !p.disconnected && p.id !== socket.id);
           if (newCreator) {
+            disconnectedPlayer.isCreator = false;
             newCreator.isCreator = true;
             roomData.creatorId = newCreator.id;
             
             io.to(room).emit('chatMessage', {
               type: 'system',
-              message: `${newCreator.name} es ahora el nuevo creador de la sala`,
+              message: `${newCreator.name} es ahora el nuevo líder de la sala`,
               timestamp: Date.now()
             });
           }
         }
         
-        roomData.players = roomData.players.filter(p => p.id !== socket.id);
-        
         io.to(room).emit('chatMessage', {
           type: 'system',
-          message: `${disconnectedPlayer.name} se desconectó`,
+          message: `${disconnectedPlayer.name} se desconectó (puede volver a conectarse)`,
           timestamp: Date.now()
         });
 
@@ -489,19 +570,22 @@ io.on("connection", (socket) => {
             name: p.name,
             eliminated: p.eliminated,
             isCreator: p.isCreator,
-            score: p.score
+            score: p.score,
+            disconnected: p.disconnected
           })),
           gameState: roomData.state,
-          canStart: roomData.players.length >= 3,
+          canStart: roomData.players.filter(p => !p.disconnected).length >= 3,
           creatorId: roomData.creatorId
         });
 
-        // Si no quedan jugadores suficientes, resetear sala
-        if (roomData.players.length < 2 && roomData.state !== GAME_STATES.LOBBY) {
-          roomData.state = GAME_STATES.LOBBY;
-          if (roomData.timer) {
-            clearTimeout(roomData.timer);
-          }
+        // Solo resetear si no quedan jugadores conectados
+        const connectedPlayers = roomData.players.filter(p => !p.disconnected);
+        if (connectedPlayers.length < 2 && roomData.state !== GAME_STATES.LOBBY) {
+          io.to(room).emit('chatMessage', {
+            type: 'system',
+            message: 'No hay suficientes jugadores conectados. El juego se pausa.',
+            timestamp: Date.now()
+          });
         }
       }
     }
