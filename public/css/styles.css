@@ -1122,3 +1122,287 @@ body {
   border-radius: 4px;
   margin-top: 2px;
 }
+
+/* ====== EXPLORAR SALAS PÚBLICAS ====== */
+.explore-rooms-section {
+  background: rgba(15, 32, 39, 0.4);
+  padding: 2rem;
+  border-radius: 20px;
+  border: 2px solid var(--lol-primary);
+  backdrop-filter: blur(10px);
+}
+
+.rooms-list {
+  max-height: 400px;
+  overflow-y: auto;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 15px;
+  padding: 1rem;
+  border: 1px solid var(--lol-primary);
+}
+
+.loading-rooms {
+  text-align: center;
+  color: var(--lol-accent);
+  padding: 2rem;
+  font-size: 1.1rem;
+}
+
+.room-card {
+  background: linear-gradient(135deg, rgba(30, 60, 114, 0.3), rgba(15, 32, 39, 0.5));
+  border: 2px solid var(--lol-primary);
+  border-radius: 15px;
+  padding: 1.5rem;
+  margin-bottom: 1rem;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.room-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--lol-gold);
+  box-shadow: 0 8px 25px rgba(200, 155, 60, 0.2);
+}
+
+.room-card.can-join {
+  border-color: var(--lol-success);
+}
+
+.room-card.can-join:hover {
+  border-color: var(--lol-gold);
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(30, 60, 114, 0.3));
+}
+
+.room-card.full {
+  border-color: var(--lol-warning);
+  opacity: 0.8;
+  cursor: not-allowed;
+}
+
+.room-card.in-game {
+  border-color: #DC2626;
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.room-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--lol-gold);
+  transform: scaleX(0);
+  transition: transform 0.3s ease;
+}
+
+.room-card:hover::before {
+  transform: scaleX(1);
+}
+
+.room-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.room-name {
+  font-size: 1.3rem;
+  font-weight: bold;
+  color: var(--lol-gold);
+  margin: 0;
+}
+
+.room-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.room-status.available {
+  color: var(--lol-success);
+}
+
+.room-status.full {
+  color: var(--lol-warning);
+}
+
+.room-status.in-game {
+  color: #DC2626;
+}
+
+.room-status i {
+  font-size: 0.8rem;
+}
+
+.room-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.room-details {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.room-detail {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--lol-accent);
+  font-size: 0.9rem;
+}
+
+.room-detail i {
+  color: var(--lol-primary);
+  width: 16px;
+  text-align: center;
+}
+
+.room-players {
+  font-weight: bold;
+}
+
+.room-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.btn-join-room {
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.btn-join-room:hover {
+  transform: translateY(-2px);
+}
+
+.no-rooms {
+  text-align: center;
+  color: var(--lol-accent);
+  padding: 3rem 1rem;
+  font-size: 1.1rem;
+}
+
+.no-rooms i {
+  font-size: 3rem;
+  color: var(--lol-primary);
+  margin-bottom: 1rem;
+  display: block;
+}
+
+/* ====== MODAL CREAR SALA PERSONALIZADA ====== */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  backdrop-filter: blur(5px);
+}
+
+.modal-content {
+  background: linear-gradient(135deg, var(--lol-dark), var(--lol-darker));
+  border: 2px solid var(--lol-gold);
+  border-radius: 20px;
+  max-width: 500px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: modalSlideIn 0.3s ease;
+}
+
+@keyframes modalSlideIn {
+  from {
+    transform: translateY(-50px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--lol-primary);
+}
+
+.modal-header h4 {
+  margin: 0;
+  color: var(--lol-gold);
+  font-size: 1.4rem;
+}
+
+.modal-body {
+  padding: 1.5rem;
+}
+
+.modal-footer {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--lol-primary);
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.form-label {
+  color: var(--lol-accent);
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
+.form-check-label {
+  color: var(--lol-accent);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.form-check-input {
+  margin: 0;
+}
+
+/* Responsividad para móviles */
+@media (max-width: 768px) {
+  .room-card {
+    padding: 1rem;
+  }
+  
+  .room-info {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  
+  .room-details {
+    gap: 1rem;
+  }
+  
+  .modal-content {
+    margin: 1rem;
+    width: calc(100% - 2rem);
+  }
+}

@@ -33,6 +33,13 @@ const elements = {
   lobbyScoresList: document.getElementById('lobby-scores-list'),
   gameScoresList: document.getElementById('game-scores-list'),
   
+  // Public rooms elements
+  roomsList: document.getElementById('rooms-list'),
+  createRoomModal: document.getElementById('create-room-modal'),
+  customRoomName: document.getElementById('custom-room-name'),
+  maxPlayersSelect: document.getElementById('max-players'),
+  isPublicCheckbox: document.getElementById('is-public'),
+  
   // Game elements
   currentRoomCode: document.getElementById('current-room-code'),
   currentRound: document.getElementById('current-round'),
@@ -853,6 +860,9 @@ function updateGamePlayersList(players) {
 document.addEventListener('DOMContentLoaded', function() {
   console.log('🎮 LOL Impostor cargado');
   
+  // Cargar salas públicas al iniciar
+  loadPublicRooms();
+  
   // Intentar reconexión automática
   setTimeout(() => {
     attemptReconnection();
@@ -873,6 +883,13 @@ document.addEventListener('DOMContentLoaded', function() {
   
   elements.wordInput?.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') submitDescription();
+  });
+  
+  // Cerrar modal con ESC
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      closeCreateRoomModal();
+    }
   });
   
   // Auto-focus en inputs
@@ -1138,6 +1155,210 @@ socket.on('reconnectSuccess', (data) => {
   }
 });
 
+// ====== MANEJO DE SALAS PÚBLICAS ====== //
+
+async function loadPublicRooms() {
+  try {
+    elements.roomsList.innerHTML = '<div class="loading-rooms"><i class="fas fa-spinner fa-spin"></i> Cargando salas...</div>';
+    
+    const response = await fetch('/api/rooms');
+    const data = await response.json();
+    
+    displayRooms(data.rooms);
+  } catch (error) {
+    console.error('Error cargando salas:', error);
+    elements.roomsList.innerHTML = `
+      <div class="no-rooms">
+        <i class="fas fa-exclamation-triangle"></i>
+        Error al cargar las salas públicas
+      </div>
+    `;
+  }
+}
+
+function displayRooms(rooms) {
+  if (!rooms || rooms.length === 0) {
+    elements.roomsList.innerHTML = `
+      <div class="no-rooms">
+        <i class="fas fa-users"></i>
+        No hay salas públicas disponibles
+        <br><small>¡Sé el primero en crear una!</small>
+      </div>
+    `;
+    return;
+  }
+  
+  let roomsHTML = '';
+  
+  rooms.forEach(room => {
+    const statusClass = room.canJoin ? 'available' : 
+                       (room.state === 'lobby' ? 'full' : 'in-game');
+    
+    const statusText = room.canJoin ? 'Disponible' :
+                      (room.state === 'lobby' ? 'Sala Llena' : 'En Juego');
+    
+    const statusIcon = room.canJoin ? 'circle' :
+                      (room.state === 'lobby' ? 'users' : 'play');
+    
+    const cardClass = room.canJoin ? 'can-join' :
+                     (room.state === 'lobby' ? 'full' : 'in-game');
+    
+    const timeAgo = formatTimeAgo(room.createdAt);
+    
+    roomsHTML += `
+      <div class="room-card ${cardClass}" ${room.canJoin ? `onclick="joinPublicRoom('${room.code}')"` : ''}>
+        <div class="room-header">
+          <h4 class="room-name">${escapeHtml(room.name)}</h4>
+          <div class="room-status ${statusClass}">
+            <i class="fas fa-${statusIcon}"></i>
+            ${statusText}
+          </div>
+        </div>
+        
+        <div class="room-info">
+          <div class="room-details">
+            <div class="room-detail">
+              <i class="fas fa-users"></i>
+              <span class="room-players">${room.players}/${room.maxPlayers}</span>
+            </div>
+            <div class="room-detail">
+              <i class="fas fa-crown"></i>
+              <span>${escapeHtml(room.creatorName)}</span>
+            </div>
+            <div class="room-detail">
+              <i class="fas fa-clock"></i>
+              <span>${timeAgo}</span>
+            </div>
+          </div>
+          
+          ${room.canJoin ? `
+            <div class="room-actions">
+              <button class="btn btn-lol btn-success btn-join-room" onclick="event.stopPropagation(); joinPublicRoom('${room.code}')">
+                <i class="fas fa-sign-in-alt"></i> Unirse
+              </button>
+            </div>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  });
+  
+  elements.roomsList.innerHTML = roomsHTML;
+}
+
+async function joinPublicRoom(roomCode) {
+  const playerName = elements.playerNameInput.value.trim();
+  
+  if (!playerName) {
+    showAlert('error', 'Por favor ingresa tu nombre');
+    elements.playerNameInput.focus();
+    return;
+  }
+  
+  // Usar la función existente joinRoom
+  elements.roomCodeInput.value = roomCode;
+  joinRoom();
+}
+
+function showCreateCustomRoomModal() {
+  const playerName = elements.playerNameInput.value.trim();
+  
+  if (!playerName) {
+    showAlert('error', 'Por favor ingresa tu nombre primero');
+    elements.playerNameInput.focus();
+    return;
+  }
+  
+  // Pre-llenar nombre de la sala
+  elements.customRoomName.value = `Sala de ${playerName}`;
+  elements.createRoomModal.style.display = 'flex';
+  elements.customRoomName.focus();
+  elements.customRoomName.select();
+}
+
+function closeCreateRoomModal() {
+  elements.createRoomModal.style.display = 'none';
+}
+
+async function createCustomRoom() {
+  const roomName = elements.customRoomName.value.trim();
+  const maxPlayers = parseInt(elements.maxPlayersSelect.value);
+  const isPublic = elements.isPublicCheckbox.checked;
+  const playerName = elements.playerNameInput.value.trim();
+  
+  if (!roomName) {
+    showAlert('error', 'Por favor ingresa un nombre para la sala');
+    return;
+  }
+  
+  if (!playerName) {
+    showAlert('error', 'Por favor ingresa tu nombre');
+    return;
+  }
+  
+  try {
+    const response = await fetch('/api/rooms', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        name: roomName,
+        maxPlayers: maxPlayers,
+        isPublic: isPublic,
+        creatorName: playerName
+      })
+    });
+    
+    const data = await response.json();
+    
+    if (data.success) {
+      closeCreateRoomModal();
+      showAlert('success', `Sala "${data.name}" creada exitosamente`);
+      
+      // Unirse automáticamente a la sala creada
+      elements.roomCodeInput.value = data.code;
+      joinRoom();
+    } else {
+      showAlert('error', data.error || 'Error al crear la sala');
+    }
+  } catch (error) {
+    console.error('Error creando sala:', error);
+    showAlert('error', 'Error al crear la sala');
+  }
+}
+
+function refreshRoomList() {
+  loadPublicRooms();
+}
+
+// Funciones helper
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function formatTimeAgo(timestamp) {
+  const now = Date.now();
+  const diff = now - timestamp;
+  const minutes = Math.floor(diff / (1000 * 60));
+  const hours = Math.floor(minutes / 60);
+  
+  if (minutes < 1) return 'Ahora';
+  if (minutes < 60) return `${minutes}m`;
+  if (hours < 24) return `${hours}h`;
+  return `${Math.floor(hours / 24)}d`;
+}
+
+// ====== EVENTOS SOCKET PARA SALAS PÚBLICAS ====== //
+socket.on('roomListUpdate', () => {
+  // Actualizar lista solo si estamos en el lobby
+  if (gameState.gamePhase === 'lobby' || !gameState.currentRoom) {
+    loadPublicRooms();
+  }
+});
+
 // ====== FUNCIONES GLOBALES PARA HTML ====== //
 window.createRoom = createRoom;
 window.joinRoom = joinRoom;
@@ -1148,3 +1369,10 @@ window.submitDescription = submitDescription;
 window.goBackToLobby = goBackToLobby;
 window.doReconnect = doReconnect;
 window.closeReconnectDialog = closeReconnectDialog;
+
+// Nuevas funciones para salas públicas
+window.refreshRoomList = refreshRoomList;
+window.showCreateCustomRoomModal = showCreateCustomRoomModal;
+window.closeCreateRoomModal = closeCreateRoomModal;
+window.createCustomRoom = createCustomRoom;
+window.joinPublicRoom = joinPublicRoom;

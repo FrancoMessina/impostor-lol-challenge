@@ -47,6 +47,30 @@
                   </div>
                 </div>
 
+                <!-- Nueva sección para explorar salas -->
+                <div class="col-12 mb-4">
+                  <div class="explore-rooms-section">
+                    <h3 class="mb-3">
+                      <i class="fas fa-search"></i> Explorar Salas Públicas
+                      <button class="btn btn-lol btn-sm btn-secondary ms-2" onclick="refreshRoomList()">
+                        <i class="fas fa-sync"></i> Actualizar
+                      </button>
+                    </h3>
+                    
+                    <div id="rooms-list" class="rooms-list">
+                      <div class="loading-rooms">
+                        <i class="fas fa-spinner fa-spin"></i> Cargando salas...
+                      </div>
+                    </div>
+                    
+                    <div class="text-center mt-3">
+                      <button class="btn btn-lol btn-success" onclick="showCreateCustomRoomModal()">
+                        <i class="fas fa-plus-circle"></i> Crear Sala Personalizada
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
                 <div class="col-md-6">
                   <div class="players-section">
                     <h4><i class="fas fa-users"></i> Jugadores (<span id="player-count">0</span>/5)</h4>
@@ -252,6 +276,55 @@
   <div id="success-alert" class="alert alert-success alert-floating" style="display: none;">
     <i class="fas fa-check-circle"></i>
     <span id="success-message"></span>
+  </div>
+
+  <!-- Modal para crear sala personalizada -->
+  <div id="create-room-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-content lol-card">
+      <div class="modal-header">
+        <h4><i class="fas fa-plus-circle"></i> Crear Sala Personalizada</h4>
+        <button class="btn btn-sm btn-secondary" onclick="closeCreateRoomModal()">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      
+      <div class="modal-body">
+        <div class="mb-3">
+          <label for="custom-room-name" class="form-label">Nombre de la Sala</label>
+          <input id="custom-room-name" class="form-control lol-input" 
+                 placeholder="Ej: Sala Pro, Principiantes, etc." 
+                 maxlength="50" />
+        </div>
+        
+        <div class="mb-3">
+          <label for="max-players" class="form-label">Máximo de Jugadores</label>
+          <select id="max-players" class="form-select lol-input">
+            <option value="3">3 jugadores</option>
+            <option value="4">4 jugadores</option>
+            <option value="5">5 jugadores</option>
+            <option value="6" selected>6 jugadores</option>
+            <option value="7">7 jugadores</option>
+            <option value="8">8 jugadores</option>
+          </select>
+        </div>
+        
+        <div class="mb-3">
+          <label class="form-check-label">
+            <input id="is-public" type="checkbox" class="form-check-input" checked>
+            Sala pública (aparece en la lista para que otros se unan)
+          </label>
+        </div>
+      </div>
+      
+      <div class="modal-footer">
+        <button class="btn btn-lol btn-secondary me-2" onclick="closeCreateRoomModal()">
+          <i class="fas fa-times"></i> Cancelar
+        </button>
+        <button class="btn btn-lol btn-success" onclick="createCustomRoom()">
+          <i class="fas fa-plus"></i> Crear Sala
+        </button>
+      </div>
+    </div>
   </div>
 
   <!-- Scripts -->

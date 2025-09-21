@@ -13,6 +13,7 @@ const io = new Server(server, {
 });
 
 app.use(express.static("public"));
+app.use(express.json()); // Para manejar JSON en requests
 
 // Estados del juego
 const GAME_STATES = {
@@ -62,7 +63,7 @@ function getChampionImageUrl(championData, championKey) {
   return `https://ddragon.leagueoflegends.com/cdn/${version}/img/champion/${championKey}.png`;
 }
 
-function initializeRoom(roomCode, creatorId) {
+function initializeRoom(roomCode, creatorId, roomData = {}) {
   return {
     code: roomCode,
     players: [],
@@ -78,7 +79,15 @@ function initializeRoom(roomCode, creatorId) {
     chatMessages: [],
     round: 0,
     creatorId: creatorId,
-    gameHistory: []
+    gameHistory: [],
+    
+    // Nueva metadata para salas públicas
+    name: roomData.name || `Sala de ${roomData.creatorName || 'Anónimo'}`,
+    isPublic: roomData.isPublic !== false, // Por defecto público
+    maxPlayers: roomData.maxPlayers || 6,
+    createdAt: Date.now(),
+    lastActivity: Date.now(),
+    creatorName: roomData.creatorName || 'Anónimo'
   };
 }
 
@@ -137,13 +146,19 @@ io.on("connection", (socket) => {
 
   socket.on("joinRoom", ({ name, room }) => {
     if (!rooms[room]) {
-      rooms[room] = initializeRoom(room, socket.id); // El primer jugador es el creador
+      // El primer jugador es el creador - crear sala con nombre automático
+      rooms[room] = initializeRoom(room, socket.id, {
+        creatorName: name,
+        name: `Sala de ${name}`,
+        isPublic: true,
+        maxPlayers: 6
+      });
     }
 
     const roomData = rooms[room];
 
     // Verificar si la sala está llena
-    if (roomData.players.length >= GAME_CONFIG.MAX_PLAYERS) {
+    if (roomData.players.length >= roomData.maxPlayers) {
       socket.emit('error', 'La sala está llena');
       return;
     }
@@ -174,6 +189,9 @@ io.on("connection", (socket) => {
 
     socket.join(room);
 
+    // Actualizar actividad de la sala
+    updateRoomActivity(room);
+
     // Enviar actualización a todos
     io.to(room).emit("playersUpdate", {
       players: roomData.players.map(p => ({
@@ -187,6 +205,9 @@ io.on("connection", (socket) => {
       canStart: roomData.players.length >= 3, // Mínimo 3 para testing
       creatorId: roomData.creatorId
     });
+
+    // Notificar cambios en la lista de salas públicas
+    notifyRoomListUpdate();
 
     io.to(room).emit('chatMessage', {
       type: 'system',
@@ -263,6 +284,10 @@ io.on("connection", (socket) => {
       message: `${name} se reconectó al juego`,
       timestamp: Date.now()
     });
+
+    // Actualizar actividad y notificar cambios
+    updateRoomActivity(room);
+    notifyRoomListUpdate();
 
     socket.emit('reconnectSuccess', {
       room: room,
@@ -613,6 +638,10 @@ io.on("connection", (socket) => {
             timestamp: Date.now()
           });
         }
+
+        // Actualizar actividad y notificar cambios en lista de salas
+        updateRoomActivity(room);
+        notifyRoomListUpdate();
       }
     }
   });
@@ -910,5 +939,108 @@ function endGame(room, winner) {
     creatorId: roomData.creatorId
   });
 }
+
+// ====== ENDPOINTS REST PARA SALAS PÚBLICAS ====== //
+
+// Listar salas públicas disponibles
+app.get('/api/rooms', (req, res) => {
+  const publicRooms = Object.values(rooms)
+    .filter(room => room.isPublic && room.players.length > 0) // Solo salas públicas con jugadores
+    .map(room => ({
+      code: room.code,
+      name: room.name,
+      players: room.players.length,
+      maxPlayers: room.maxPlayers,
+      state: room.state,
+      createdAt: room.createdAt,
+      creatorName: room.creatorName,
+      canJoin: room.state === GAME_STATES.LOBBY && room.players.length < room.maxPlayers
+    }))
+    .sort((a, b) => {
+      // Priorizar salas que se pueden unir, luego por jugadores
+      if (a.canJoin && !b.canJoin) return -1;
+      if (!a.canJoin && b.canJoin) return 1;
+      return b.players - a.players; // Más jugadores primero
+    });
+    
+  res.json({ rooms: publicRooms });
+});
+
+// Crear sala con nombre personalizado
+app.post('/api/rooms', (req, res) => {
+  const { name, isPublic = true, maxPlayers = 6, creatorName = 'Anónimo' } = req.body;
+  
+  if (!name || name.trim().length < 1) {
+    return res.status(400).json({ error: 'El nombre de la sala es requerido' });
+  }
+  
+  if (name.length > 50) {
+    return res.status(400).json({ error: 'El nombre de la sala es muy largo (máximo 50 caracteres)' });
+  }
+  
+  if (maxPlayers < 3 || maxPlayers > 8) {
+    return res.status(400).json({ error: 'El número de jugadores debe estar entre 3 y 8' });
+  }
+  
+  // Generar código único
+  let roomCode;
+  do {
+    roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+  } while (rooms[roomCode]);
+  
+  // Crear sala con metadata
+  rooms[roomCode] = initializeRoom(roomCode, null, {
+    name: name.trim(),
+    isPublic,
+    maxPlayers,
+    creatorName: creatorName.trim() || 'Anónimo'
+  });
+  
+  res.json({ 
+    code: roomCode, 
+    name: rooms[roomCode].name,
+    success: true 
+  });
+});
+
+// ====== FUNCIONES HELPER PARA SALAS ====== //
+function updateRoomActivity(room) {
+  if (rooms[room]) {
+    rooms[room].lastActivity = Date.now();
+  }
+}
+
+function notifyRoomListUpdate() {
+  // Notificar a todos los clientes para actualizar la lista de salas públicas
+  io.emit('roomListUpdate');
+}
+
+// ====== LIMPIEZA AUTOMÁTICA DE SALAS ====== //
+function cleanupEmptyRooms() {
+  const now = Date.now();
+  const roomsToDelete = [];
+  
+  for (const [code, room] of Object.entries(rooms)) {
+    const isEmpty = room.players.filter(p => !p.disconnected).length === 0;
+    const isOld = now - room.lastActivity > 30 * 60 * 1000; // 30 minutos sin actividad
+    
+    if (isEmpty && isOld) {
+      roomsToDelete.push(code);
+    }
+  }
+  
+  roomsToDelete.forEach(code => {
+    console.log(`🧹 Limpiando sala vacía: ${code}`);
+    delete rooms[code];
+  });
+  
+  if (roomsToDelete.length > 0) {
+    // Notificar a todos los clientes para actualizar la lista
+    io.emit('roomListUpdate');
+  }
+}
+
+// Ejecutar limpieza cada 10 minutos
+setInterval(cleanupEmptyRooms, 10 * 60 * 1000);
 
 server.listen(3000, () => console.log("🎮 Servidor LOL Impostor en http://localhost:3000"));
