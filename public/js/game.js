@@ -10,7 +10,9 @@ let gameState = {
   currentPlayerTurn: null,
   timerInterval: null,
   hasVoted: false,
-  canDescribe: false
+  canDescribe: false,
+  isCreator: false,
+  playerScores: []
 };
 
 // ====== ELEMENTOS DEL DOM ====== //
@@ -23,6 +25,11 @@ const elements = {
   playersGrid: document.getElementById('players-list'),
   playerCount: document.getElementById('player-count'),
   startGameBtn: document.getElementById('start-game-btn'),
+  
+  // Scoreboard elements
+  lobbyScoreboard: document.getElementById('lobby-scoreboard'),
+  lobbyScoresList: document.getElementById('lobby-scores-list'),
+  gameScoresList: document.getElementById('game-scores-list'),
   
   // Game elements
   currentRoomCode: document.getElementById('current-room-code'),
@@ -143,11 +150,31 @@ function startGame() {
   socket.emit('startGame', gameState.currentRoom);
 }
 
+function restartGame() {
+  if (!gameState.currentRoom) {
+    showAlert('error', 'No estás en una sala');
+    return;
+  }
+  
+  if (!gameState.isCreator) {
+    showAlert('error', 'Solo el creador puede reiniciar el juego');
+    return;
+  }
+  
+  socket.emit('restartGame', gameState.currentRoom);
+  showAlert('success', 'Iniciando nueva partida...');
+}
+
 function updatePlayersDisplay(playersData) {
-  const { players, canStart } = playersData;
+  const { players, canStart, creatorId } = playersData;
   
   gameState.players = players;
+  gameState.playerScores = players;
   elements.playerCount.textContent = players.length;
+  
+  // Verificar si el jugador actual es el creador
+  const currentPlayer = players.find(p => p.name === gameState.playerName);
+  gameState.isCreator = currentPlayer ? currentPlayer.isCreator : false;
   
   // Actualizar grid de jugadores
   const slots = elements.playersGrid.querySelectorAll('.empty-slot, .player-slot');
@@ -155,7 +182,12 @@ function updatePlayersDisplay(playersData) {
   slots.forEach((slot, index) => {
     if (players[index]) {
       slot.className = 'player-slot';
-      slot.textContent = players[index].name;
+      let playerText = players[index].name;
+      if (players[index].isCreator) {
+        playerText += ' 👑';
+      }
+      slot.textContent = playerText;
+      
       if (players[index].eliminated) {
         slot.classList.add('eliminated');
       }
@@ -165,6 +197,15 @@ function updatePlayersDisplay(playersData) {
     }
   });
   
+  // Actualizar scoreboard
+  updateScoreboard(players);
+  
+  // Mostrar scoreboard si hay jugadores con puntos
+  const hasScores = players.some(p => p.score > 0);
+  if (hasScores && elements.lobbyScoreboard) {
+    elements.lobbyScoreboard.style.display = 'block';
+  }
+  
   // Habilitar botón de inicio
   elements.startGameBtn.disabled = !canStart;
   if (canStart) {
@@ -172,6 +213,62 @@ function updatePlayersDisplay(playersData) {
   } else {
     elements.startGameBtn.classList.remove('pulse');
   }
+}
+
+// ====== FUNCIONES DE SCOREBOARD ====== //
+function updateScoreboard(players) {
+  // Ordenar jugadores por puntuación (descendente)
+  const sortedPlayers = [...players].sort((a, b) => b.score - a.score);
+  
+  // Actualizar scoreboard del lobby
+  if (elements.lobbyScoresList) {
+    updateScoresList(elements.lobbyScoresList, sortedPlayers);
+  }
+  
+  // Actualizar scoreboard del juego
+  if (elements.gameScoresList) {
+    updateScoresList(elements.gameScoresList, sortedPlayers);
+  }
+}
+
+function updateScoresList(container, players) {
+  container.innerHTML = '';
+  
+  players.forEach((player, index) => {
+    const scoreItem = document.createElement('div');
+    scoreItem.className = `score-item ${player.isCreator ? 'creator' : ''}`;
+    
+    const rankEmoji = ['🥇', '🥈', '🥉'][index] || '🏅';
+    
+    scoreItem.innerHTML = `
+      <div style="display: flex; align-items: center;">
+        <span style="margin-right: 8px; font-size: 1.1rem;">${rankEmoji}</span>
+        <span class="player-name">${player.name}</span>
+      </div>
+      <div style="display: flex; align-items: center;">
+        <span class="score-details">${player.gamesWon || 0}W</span>
+        <span class="player-score">${player.score}</span>
+      </div>
+    `;
+    
+    container.appendChild(scoreItem);
+  });
+}
+
+function animateScoreIncrease(playerName, newScore) {
+  // Animar el aumento de puntuación
+  const scoreElements = document.querySelectorAll(`.score-item .player-name`);
+  scoreElements.forEach(nameElement => {
+    if (nameElement.textContent.includes(playerName)) {
+      const scoreElement = nameElement.closest('.score-item').querySelector('.player-score');
+      if (scoreElement) {
+        scoreElement.classList.add('score-increase');
+        setTimeout(() => {
+          scoreElement.classList.remove('score-increase');
+        }, 600);
+      }
+    }
+  });
 }
 
 // ====== FUNCIONES DE JUEGO ====== //
@@ -630,12 +727,74 @@ socket.on('gameEnd', (endData) => {
         <strong>El impostor era:</strong> ${endData.impostor}
       </div>
     </div>
-    <button class="btn btn-lol btn-warning" onclick="location.reload()" style="margin-top: 1.5rem;">
-      <i class="fas fa-redo"></i> Jugar Otra Vez
-    </button>
   `;
   
+  // Mostrar puntuaciones actualizadas
+  if (endData.scores && endData.scores.length > 0) {
+    endHTML += `
+      <div style="margin-top: 1.5rem;">
+        <h5 style="color: var(--lol-gold); margin-bottom: 1rem;">🏆 Puntuaciones Actualizadas</h5>
+        <div class="scores-summary">
+    `;
+    
+    // Ordenar por puntuación
+    const sortedScores = endData.scores.sort((a, b) => b.score - a.score);
+    
+    sortedScores.forEach((player, index) => {
+      const rankEmoji = ['🥇', '🥈', '🥉'][index] || '🏅';
+      const isWinner = (endData.winner === 'impostor' && endData.impostor === player.name) ||
+                      (endData.winner === 'investigators' && endData.impostor !== player.name);
+      
+      endHTML += `
+        <div class="score-summary-item ${isWinner ? 'winner' : ''}">
+          <span>${rankEmoji} ${player.name}${player.isCreator ? ' 👑' : ''}</span>
+          <span class="score-badge ${isWinner ? 'winner-badge' : ''}">${player.score} pts</span>
+        </div>
+      `;
+    });
+    
+    endHTML += `
+        </div>
+      </div>
+    `;
+  }
+  
+  // Mostrar botón de "Volver a Jugar" solo para el creador
+  if (endData.canRestart && gameState.isCreator) {
+    endHTML += `
+      <button class="btn btn-lol btn-warning" onclick="restartGame()" style="margin-top: 1.5rem;">
+        <i class="fas fa-play"></i> Volver a Jugar
+      </button>
+    `;
+  } else if (endData.canRestart) {
+    endHTML += `
+      <div style="margin-top: 1.5rem; color: var(--lol-accent); opacity: 0.8;">
+        <i class="fas fa-info-circle"></i> 
+        Esperando a que ${endData.creatorName} inicie otra partida...
+      </div>
+    `;
+  } else {
+    endHTML += `
+      <button class="btn btn-lol btn-warning" onclick="location.reload()" style="margin-top: 1.5rem;">
+        <i class="fas fa-redo"></i> Volver al Lobby
+      </button>
+    `;
+  }
+  
   elements.resultContent.innerHTML = endHTML;
+  
+  // Actualizar puntuaciones en el scoreboard
+  if (endData.scores) {
+    gameState.playerScores = endData.scores;
+    updateScoreboard(endData.scores);
+    
+    // Animar aumentos de puntuación
+    endData.scores.forEach(player => {
+      if (player.score > 0) {
+        setTimeout(() => animateScoreIncrease(player.name, player.score), 1000);
+      }
+    });
+  }
   
   showAlert('success', '¡Juego terminado!');
   playNotificationSound();
@@ -653,5 +812,6 @@ socket.on('gameEnd', (endData) => {
 window.createRoom = createRoom;
 window.joinRoom = joinRoom;
 window.startGame = startGame;
+window.restartGame = restartGame;
 window.sendMessage = sendMessage;
 window.submitDescription = submitDescription;

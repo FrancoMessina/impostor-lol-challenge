@@ -501,8 +501,141 @@ body {
 
 /* ====== LISTA DE JUGADORES EN JUEGO ====== */
 .game-players-list {
-  max-height: 300px;
+  max-height: 200px;
   overflow-y: auto;
+}
+
+/* ====== SCOREBOARD ====== */
+.scoreboard {
+  background: rgba(30, 60, 114, 0.1);
+  border-radius: 10px;
+  padding: 1rem;
+  border: 1px solid rgba(200, 155, 60, 0.2);
+  margin-top: 1rem;
+}
+
+.scoreboard h5 {
+  color: var(--lol-gold);
+  margin-bottom: 1rem;
+  text-align: center;
+  font-weight: 600;
+}
+
+.scores-list {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.score-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  margin-bottom: 6px;
+  background: rgba(15, 32, 39, 0.3);
+  border-radius: 6px;
+  border-left: 3px solid var(--lol-gold);
+  transition: all 0.3s ease;
+}
+
+.score-item:hover {
+  background: rgba(15, 32, 39, 0.5);
+  transform: translateX(3px);
+}
+
+.score-item.creator {
+  border-left-color: #FFA500;
+  background: rgba(255, 165, 0, 0.1);
+}
+
+.score-item.creator .player-name::after {
+  content: ' 👑';
+  font-size: 0.8rem;
+  color: #FFA500;
+}
+
+.player-name {
+  font-weight: 600;
+  color: var(--lol-accent);
+  flex: 1;
+}
+
+.player-score {
+  background: var(--lol-gold);
+  color: var(--lol-dark-blue);
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  min-width: 30px;
+  text-align: center;
+}
+
+.score-details {
+  font-size: 0.8rem;
+  color: var(--lol-accent);
+  opacity: 0.7;
+  margin-left: 8px;
+}
+
+/* Animación para puntos nuevos */
+@keyframes scoreIncrease {
+  0% { transform: scale(1); background: var(--lol-gold); }
+  50% { transform: scale(1.2); background: #00FF00; }
+  100% { transform: scale(1); background: var(--lol-gold); }
+}
+
+.score-increase {
+  animation: scoreIncrease 0.6s ease;
+}
+
+/* ====== RESUMEN DE PUNTUACIONES ====== */
+.scores-summary {
+  background: rgba(15, 32, 39, 0.3);
+  border-radius: 8px;
+  padding: 1rem;
+  border: 1px solid rgba(200, 155, 60, 0.2);
+}
+
+.score-summary-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  margin-bottom: 6px;
+  background: rgba(30, 60, 114, 0.1);
+  border-radius: 6px;
+  transition: all 0.3s ease;
+  border-left: 3px solid rgba(200, 155, 60, 0.3);
+}
+
+.score-summary-item.winner {
+  background: rgba(200, 155, 60, 0.2);
+  border-left-color: var(--lol-gold);
+  box-shadow: 0 0 10px rgba(200, 155, 60, 0.3);
+  animation: winnerGlow 2s ease-in-out infinite;
+}
+
+.score-badge {
+  background: rgba(200, 155, 60, 0.2);
+  color: var(--lol-gold);
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  border: 1px solid rgba(200, 155, 60, 0.3);
+}
+
+.score-badge.winner-badge {
+  background: var(--lol-gold);
+  color: var(--lol-dark-blue);
+  border-color: var(--lol-gold);
+  box-shadow: 0 0 8px rgba(200, 155, 60, 0.5);
+}
+
+@keyframes winnerGlow {
+  0%, 100% { box-shadow: 0 0 10px rgba(200, 155, 60, 0.3); }
+  50% { box-shadow: 0 0 20px rgba(200, 155, 60, 0.6); }
 }
 
 .game-player-item {

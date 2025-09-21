@@ -62,12 +62,13 @@ function getChampionImageUrl(championData, championKey) {
   return `https://ddragon.leagueoflegends.com/cdn/${version}/img/champion/${championKey}.png`;
 }
 
-function initializeRoom(roomCode) {
+function initializeRoom(roomCode, creatorId) {
   return {
     code: roomCode,
     players: [],
     state: GAME_STATES.LOBBY,
     champion: null,
+    championData: null,
     impostorIndex: -1,
     currentTurn: 0,
     turnStartTime: null,
@@ -75,7 +76,9 @@ function initializeRoom(roomCode) {
     votes: {},
     eliminated: [],
     chatMessages: [],
-    round: 0
+    round: 0,
+    creatorId: creatorId,
+    gameHistory: []
   };
 }
 
@@ -134,7 +137,7 @@ io.on("connection", (socket) => {
 
   socket.on("joinRoom", ({ name, room }) => {
     if (!rooms[room]) {
-      rooms[room] = initializeRoom(room);
+      rooms[room] = initializeRoom(room, socket.id); // El primer jugador es el creador
     }
 
     const roomData = rooms[room];
@@ -151,6 +154,8 @@ io.on("connection", (socket) => {
       return;
     }
 
+    const isCreator = roomData.players.length === 0;
+
     // Agregar jugador
     roomData.players.push({
       id: socket.id,
@@ -158,7 +163,12 @@ io.on("connection", (socket) => {
       impostor: false,
       eliminated: false,
       hasVoted: false,
-      hasDescribed: false
+      hasDescribed: false,
+      isCreator: isCreator,
+      score: 0,
+      gamesWon: 0,
+      gamesAsImpostor: 0,
+      gamesAsInvestigator: 0
     });
 
     socket.join(room);
@@ -167,15 +177,18 @@ io.on("connection", (socket) => {
     io.to(room).emit("playersUpdate", {
       players: roomData.players.map(p => ({
         name: p.name,
-        eliminated: p.eliminated
+        eliminated: p.eliminated,
+        isCreator: p.isCreator,
+        score: p.score
       })),
       gameState: roomData.state,
-      canStart: roomData.players.length >= 3 // Mínimo 3 para testing
+      canStart: roomData.players.length >= 3, // Mínimo 3 para testing
+      creatorId: roomData.creatorId
     });
 
     io.to(room).emit('chatMessage', {
       type: 'system',
-      message: `${name} se unió a la sala`,
+      message: `${name} se unió a la sala${isCreator ? ' (Creador)' : ''}`,
       timestamp: Date.now()
     });
   });
@@ -335,6 +348,33 @@ io.on("connection", (socket) => {
     }
   });
 
+  socket.on('restartGame', (room) => {
+    const roomData = rooms[room];
+    if (!roomData) return;
+
+    // Verificar si quien solicita es el creador
+    const player = getPlayerById(room, socket.id);
+    if (!player || !player.isCreator) {
+      socket.emit('error', 'Solo el creador puede reiniciar el juego');
+      return;
+    }
+
+    if (roomData.state !== GAME_STATES.LOBBY) {
+      socket.emit('error', 'El juego debe haber terminado para reiniciar');
+      return;
+    }
+
+    // Reiniciar el juego manteniendo los puntos
+    io.to(room).emit('chatMessage', {
+      type: 'system',
+      message: `${player.name} ha iniciado una nueva partida`,
+      timestamp: Date.now()
+    });
+
+    // Iniciar nuevo juego usando la misma lógica que startGame
+    socket.emit('startGame', room);
+  });
+
   socket.on("disconnect", () => {
     const room = getRoomBySocket(socket.id);
     if (room && rooms[room]) {
@@ -342,6 +382,21 @@ io.on("connection", (socket) => {
       const disconnectedPlayer = roomData.players.find(p => p.id === socket.id);
       
       if (disconnectedPlayer) {
+        // Si se desconecta el creador, asignar a otro jugador como creador
+        if (disconnectedPlayer.isCreator && roomData.players.length > 1) {
+          const newCreator = roomData.players.find(p => p.id !== socket.id);
+          if (newCreator) {
+            newCreator.isCreator = true;
+            roomData.creatorId = newCreator.id;
+            
+            io.to(room).emit('chatMessage', {
+              type: 'system',
+              message: `${newCreator.name} es ahora el nuevo creador de la sala`,
+              timestamp: Date.now()
+            });
+          }
+        }
+        
         roomData.players = roomData.players.filter(p => p.id !== socket.id);
         
         io.to(room).emit('chatMessage', {
@@ -353,9 +408,13 @@ io.on("connection", (socket) => {
         io.to(room).emit("playersUpdate", {
           players: roomData.players.map(p => ({
             name: p.name,
-            eliminated: p.eliminated
+            eliminated: p.eliminated,
+            isCreator: p.isCreator,
+            score: p.score
           })),
-          gameState: roomData.state
+          gameState: roomData.state,
+          canStart: roomData.players.length >= 3,
+          creatorId: roomData.creatorId
         });
 
         // Si no quedan jugadores suficientes, resetear sala
@@ -563,12 +622,57 @@ function endGame(room, winner) {
     ? '🔥 El IMPOSTOR ha ganado! Logró sobrevivir y engañar a todos!' 
     : '🏆 Los INVESTIGADORES han ganado! Eliminaron al impostor!';
 
+  // Calcular y asignar puntos
+  const impostorPlayer = roomData.players.find(p => p.impostor);
+  const investigatorPlayers = roomData.players.filter(p => !p.impostor);
+
+  if (winner === 'impostor') {
+    // Impostor gana: +3 puntos al impostor
+    impostorPlayer.score += 3;
+    impostorPlayer.gamesWon++;
+    impostorPlayer.gamesAsImpostor++;
+    
+    // Los investigadores aumentan su contador pero no ganan puntos
+    investigatorPlayers.forEach(player => {
+      player.gamesAsInvestigator++;
+    });
+  } else {
+    // Investigadores ganan: +1 punto a cada investigador
+    investigatorPlayers.forEach(player => {
+      player.score += 1;
+      player.gamesWon++;
+      player.gamesAsInvestigator++;
+    });
+    
+    // El impostor aumenta su contador pero no gana puntos
+    impostorPlayer.gamesAsImpostor++;
+  }
+
+  // Guardar en historial
+  roomData.gameHistory.push({
+    round: roomData.round,
+    winner: winner,
+    champion: roomData.champion,
+    impostor: impostorPlayer.name,
+    timestamp: Date.now()
+  });
+
+  const creatorPlayer = roomData.players.find(p => p.isCreator);
+
   io.to(room).emit('gameEnd', {
     winner: winner,
     message: winMessage,
     champion: roomData.champion,
     championData: roomData.championData,
-    impostor: roomData.players.find(p => p.impostor).name
+    impostor: impostorPlayer.name,
+    scores: roomData.players.map(p => ({
+      name: p.name,
+      score: p.score,
+      gamesWon: p.gamesWon,
+      isCreator: p.isCreator
+    })),
+    canRestart: creatorPlayer ? true : false,
+    creatorName: creatorPlayer ? creatorPlayer.name : null
   });
 
   io.to(room).emit('chatMessage', {
@@ -577,12 +681,25 @@ function endGame(room, winner) {
     timestamp: Date.now()
   });
 
-  // Resetear jugadores para nueva partida
+  // Resetear jugadores para nueva partida (mantener puntos)
   roomData.players.forEach(player => {
     player.impostor = false;
     player.eliminated = false;
     player.hasVoted = false;
     player.hasDescribed = false;
+  });
+
+  // Actualizar lista de jugadores con nuevos puntajes
+  io.to(room).emit("playersUpdate", {
+    players: roomData.players.map(p => ({
+      name: p.name,
+      eliminated: p.eliminated,
+      isCreator: p.isCreator,
+      score: p.score
+    })),
+    gameState: roomData.state,
+    canStart: roomData.players.length >= 3,
+    creatorId: roomData.creatorId
   });
 }
 
