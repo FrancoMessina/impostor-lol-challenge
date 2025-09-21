@@ -1071,6 +1071,11 @@ socket.on('gameEnd', (endData) => {
   
   elements.resultContent.innerHTML = endHTML;
   
+  // Cambiar a la sección de resultados
+  hideAllSections();
+  elements.resultsSection.style.display = 'block';
+  gameState.gamePhase = 'results';
+  
   // Actualizar puntuaciones en el scoreboard
   if (endData.scores) {
     gameState.playerScores = endData.scores;
