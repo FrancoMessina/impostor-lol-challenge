@@ -326,9 +326,9 @@ io.on("connection", (socket) => {
       roomData.votes = {};
       roomData.round++;
 
-      // Encontrar el primer jugador vivo (al inicio todos están vivos, pero por consistencia)
+      // Encontrar el primer jugador vivo y conectado (al inicio todos están vivos, pero por consistencia)
       let firstAliveIndex = 0;
-      while (firstAliveIndex < roomData.players.length && roomData.players[firstAliveIndex].eliminated) {
+      while (firstAliveIndex < roomData.players.length && (roomData.players[firstAliveIndex].eliminated || roomData.players[firstAliveIndex].disconnected)) {
         firstAliveIndex++;
       }
       roomData.currentTurn = firstAliveIndex;
@@ -396,7 +396,7 @@ io.on("connection", (socket) => {
 
     // Verificar si es el turno del jugador
     const currentPlayer = roomData.players[roomData.currentTurn];
-    if (currentPlayer.id !== socket.id) return;
+    if (!currentPlayer || currentPlayer.disconnected || currentPlayer.id !== socket.id) return;
 
     // Marcar como descrito y avanzar turno
     player.hasDescribed = true;
@@ -515,9 +515,9 @@ io.on("connection", (socket) => {
         roomData.votes = {};
         roomData.round++;
 
-        // Encontrar el primer jugador vivo
+        // Encontrar el primer jugador vivo y conectado
         let firstAliveIndex = 0;
-        while (firstAliveIndex < roomData.players.length && roomData.players[firstAliveIndex].eliminated) {
+        while (firstAliveIndex < roomData.players.length && (roomData.players[firstAliveIndex].eliminated || roomData.players[firstAliveIndex].disconnected)) {
           firstAliveIndex++;
         }
         roomData.currentTurn = firstAliveIndex;
@@ -626,8 +626,8 @@ function nextTurn(room) {
     clearTimeout(roomData.timer);
   }
 
-  // Buscar el siguiente jugador vivo
-  const alivePlayers = roomData.players.filter(p => !p.eliminated);
+  // Buscar el siguiente jugador vivo y conectado
+  const alivePlayers = roomData.players.filter(p => !p.eliminated && !p.disconnected);
   
   // Encontrar el siguiente jugador vivo después del currentTurn actual
   let nextTurnIndex = roomData.currentTurn;
@@ -636,7 +636,7 @@ function nextTurn(room) {
   do {
     nextTurnIndex = (nextTurnIndex + 1) % roomData.players.length;
     attempts++;
-  } while (roomData.players[nextTurnIndex].eliminated && attempts < roomData.players.length);
+  } while ((roomData.players[nextTurnIndex].eliminated || roomData.players[nextTurnIndex].disconnected) && attempts < roomData.players.length);
   
   roomData.currentTurn = nextTurnIndex;
 
@@ -792,9 +792,9 @@ function startNextRound(room) {
   roomData.votes = {};
   roomData.round++;
 
-  // Encontrar el primer jugador vivo para empezar la ronda
+  // Encontrar el primer jugador vivo y conectado para empezar la ronda
   let firstAliveIndex = 0;
-  while (firstAliveIndex < roomData.players.length && roomData.players[firstAliveIndex].eliminated) {
+  while (firstAliveIndex < roomData.players.length && (roomData.players[firstAliveIndex].eliminated || roomData.players[firstAliveIndex].disconnected)) {
     firstAliveIndex++;
   }
   
