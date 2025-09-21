@@ -198,6 +198,13 @@ io.on("connection", (socket) => {
     
     const roomData = rooms[room];
     
+    // Verificar si quien solicita es el creador
+    const player = getPlayerById(room, socket.id);
+    if (!player || !player.isCreator) {
+      socket.emit('error', 'Solo el líder de la sala puede iniciar el juego');
+      return;
+    }
+    
     if (roomData.players.length < 3) {
       socket.emit('error', 'Se necesitan al menos 3 jugadores');
       return;
@@ -348,7 +355,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on('restartGame', (room) => {
+  socket.on('restartGame', async (room) => {
     const roomData = rooms[room];
     if (!roomData) return;
 
@@ -364,15 +371,87 @@ io.on("connection", (socket) => {
       return;
     }
 
-    // Reiniciar el juego manteniendo los puntos
+    if (roomData.players.length < 3) {
+      socket.emit('error', 'Se necesitan al menos 3 jugadores');
+      return;
+    }
+
+    // Notificar que se está reiniciando
     io.to(room).emit('chatMessage', {
       type: 'system',
-      message: `${player.name} ha iniciado una nueva partida`,
+      message: `${player.name} 👑 ha iniciado una nueva partida`,
       timestamp: Date.now()
     });
 
-    // Iniciar nuevo juego usando la misma lógica que startGame
-    socket.emit('startGame', room);
+    // Esperar un momento para el feedback visual
+    setTimeout(async () => {
+      try {
+        const championsData = await getChampions();
+        const championKeys = Object.keys(championsData);
+        const selectedChampionKey = championKeys[Math.floor(Math.random() * championKeys.length)];
+        const selectedChampion = championsData[selectedChampionKey];
+        
+        const championInfo = {
+          name: selectedChampion.name || selectedChampionKey,
+          image: getChampionImageUrl(championsData, selectedChampionKey),
+          title: selectedChampion.title || "",
+          key: selectedChampionKey
+        };
+        
+        // Mezclar jugadores y asignar impostor
+        let shuffledPlayers = [...roomData.players].sort(() => Math.random() - 0.5);
+        const impostorIndex = 0; // El primer jugador mezclado será el impostor
+        
+        shuffledPlayers.forEach((player, index) => {
+          player.impostor = index === impostorIndex;
+          player.eliminated = false;
+          player.hasVoted = false;
+          player.hasDescribed = false;
+        });
+
+        roomData.players = shuffledPlayers;
+        roomData.champion = championInfo.name;
+        roomData.championData = championInfo;
+        roomData.impostorIndex = impostorIndex;
+        roomData.state = GAME_STATES.DESCRIBING;
+        roomData.currentTurn = 0;
+        roomData.votes = {};
+        roomData.round++;
+
+        // Enviar roles a cada jugador
+        roomData.players.forEach(player => {
+          io.to(player.id).emit("roleAssigned", {
+            champion: player.impostor ? null : championInfo.name,
+            championData: player.impostor ? null : championInfo,
+            impostor: player.impostor,
+            gameState: GAME_STATES.DESCRIBING
+          });
+        });
+
+        // Enviar estado inicial del juego
+        io.to(room).emit('gameStateUpdate', {
+          state: GAME_STATES.DESCRIBING,
+          currentPlayer: roomData.players[0].name,
+          round: roomData.round,
+          champion: null
+        });
+
+        io.to(room).emit('chatMessage', {
+          type: 'system',
+          message: `¡Nueva partida iniciada! Ronda ${roomData.round}. Es el turno de ${roomData.players[0].name} para describir.`,
+          timestamp: Date.now()
+        });
+
+        // Iniciar temporizador para el primer turno
+        startTimer(room, GAME_CONFIG.DESCRIBE_TIME, () => {
+          nextTurn(room);
+        });
+
+      } catch (error) {
+        console.error("Error reiniciando juego:", error);
+        socket.emit('error', 'Error al reiniciar el juego');
+      }
+    }, 1000);
   });
 
   socket.on("disconnect", () => {

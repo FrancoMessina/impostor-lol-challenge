@@ -161,8 +161,32 @@ function restartGame() {
     return;
   }
   
+  // Deshabilitar botón para evitar clics múltiples
+  const restartBtn = document.querySelector('button[onclick="restartGame()"]');
+  if (restartBtn) {
+    restartBtn.disabled = true;
+    restartBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Iniciando...';
+  }
+  
   socket.emit('restartGame', gameState.currentRoom);
   showAlert('success', 'Iniciando nueva partida...');
+  
+  // Volver al lobby y luego iniciar automáticamente
+  setTimeout(() => {
+    elements.lobbyScreen.style.display = 'block';
+    elements.gameScreen.style.display = 'none';
+    
+    // Resetear estado
+    gameState.gamePhase = 'lobby';
+    gameState.hasVoted = false;
+    gameState.canDescribe = false;
+    gameState.hasDescribed = false;
+    
+    // Limpiar chat
+    elements.chatMessages.innerHTML = '';
+    
+    showAlert('success', 'Volviendo al lobby...');
+  }, 1000);
 }
 
 function updatePlayersDisplay(playersData) {
@@ -206,12 +230,46 @@ function updatePlayersDisplay(playersData) {
     elements.lobbyScoreboard.style.display = 'block';
   }
   
-  // Habilitar botón de inicio
-  elements.startGameBtn.disabled = !canStart;
-  if (canStart) {
-    elements.startGameBtn.classList.add('pulse');
+  // Habilitar botón de inicio - solo para el creador
+  const canStartGame = canStart && gameState.isCreator;
+  elements.startGameBtn.disabled = !canStartGame;
+  
+  if (gameState.isCreator) {
+    if (canStart) {
+      elements.startGameBtn.classList.add('pulse');
+      elements.startGameBtn.innerHTML = '<i class="fas fa-play"></i> Iniciar Juego';
+      elements.startGameBtn.style.display = 'block';
+    } else {
+      elements.startGameBtn.classList.remove('pulse');
+      elements.startGameBtn.innerHTML = '<i class="fas fa-users"></i> Esperando más jugadores...';
+      elements.startGameBtn.style.display = 'block';
+    }
   } else {
-    elements.startGameBtn.classList.remove('pulse');
+    elements.startGameBtn.style.display = 'none';
+    
+    // Mostrar mensaje para jugadores que no son creadores
+    let waitingMessage = document.getElementById('waiting-for-leader');
+    if (!waitingMessage) {
+      waitingMessage = document.createElement('div');
+      waitingMessage.id = 'waiting-for-leader';
+      waitingMessage.className = 'waiting-message';
+      elements.startGameBtn.parentNode.appendChild(waitingMessage);
+    }
+    
+    const leaderName = players.find(p => p.isCreator)?.name || 'el líder';
+    if (canStart) {
+      waitingMessage.innerHTML = `
+        <i class="fas fa-clock"></i> 
+        Esperando a que <strong>${leaderName}</strong> inicie el juego...
+      `;
+      waitingMessage.style.display = 'block';
+    } else {
+      waitingMessage.innerHTML = `
+        <i class="fas fa-users"></i> 
+        Esperando más jugadores... (mínimo 3)
+      `;
+      waitingMessage.style.display = 'block';
+    }
   }
 }
 
@@ -759,25 +817,40 @@ socket.on('gameEnd', (endData) => {
     `;
   }
   
-  // Mostrar botón de "Volver a Jugar" solo para el creador
+  // Mostrar controles de reinicio - solo para el líder
   if (endData.canRestart && gameState.isCreator) {
     endHTML += `
-      <button class="btn btn-lol btn-warning" onclick="restartGame()" style="margin-top: 1.5rem;">
-        <i class="fas fa-play"></i> Volver a Jugar
-      </button>
+      <div style="margin-top: 1.5rem; text-align: center;">
+        <div style="margin-bottom: 1rem; color: var(--lol-gold); font-weight: 600;">
+          <i class="fas fa-crown"></i> Como líder, puedes iniciar otra partida
+        </div>
+        <button class="btn btn-lol btn-warning" onclick="restartGame()" style="margin-right: 10px;">
+          <i class="fas fa-play"></i> Nueva Partida
+        </button>
+        <button class="btn btn-lol btn-secondary" onclick="location.reload()">
+          <i class="fas fa-sign-out-alt"></i> Salir al Lobby
+        </button>
+      </div>
     `;
   } else if (endData.canRestart) {
     endHTML += `
-      <div style="margin-top: 1.5rem; color: var(--lol-accent); opacity: 0.8;">
-        <i class="fas fa-info-circle"></i> 
-        Esperando a que ${endData.creatorName} inicie otra partida...
+      <div style="margin-top: 1.5rem; text-align: center;">
+        <div class="waiting-for-leader-restart">
+          <i class="fas fa-hourglass-half"></i> 
+          Esperando a que <strong>${endData.creatorName}</strong> 👑 inicie otra partida...
+        </div>
+        <button class="btn btn-lol btn-secondary" onclick="location.reload()" style="margin-top: 10px;">
+          <i class="fas fa-sign-out-alt"></i> Salir al Lobby
+        </button>
       </div>
     `;
   } else {
     endHTML += `
-      <button class="btn btn-lol btn-warning" onclick="location.reload()" style="margin-top: 1.5rem;">
-        <i class="fas fa-redo"></i> Volver al Lobby
-      </button>
+      <div style="margin-top: 1.5rem; text-align: center;">
+        <button class="btn btn-lol btn-warning" onclick="location.reload()">
+          <i class="fas fa-redo"></i> Volver al Lobby
+        </button>
+      </div>
     `;
   }
   

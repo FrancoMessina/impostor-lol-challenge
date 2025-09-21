@@ -638,6 +638,70 @@ body {
   50% { box-shadow: 0 0 20px rgba(200, 155, 60, 0.6); }
 }
 
+/* ====== MENSAJE DE ESPERA PARA NO LÍDERES ====== */
+.waiting-message {
+  background: rgba(30, 60, 114, 0.15);
+  border: 2px dashed rgba(200, 155, 60, 0.4);
+  border-radius: 10px;
+  padding: 15px;
+  margin-top: 10px;
+  text-align: center;
+  color: var(--lol-accent);
+  font-weight: 500;
+  animation: waitingPulse 2s ease-in-out infinite;
+}
+
+.waiting-message i {
+  color: var(--lol-gold);
+  margin-right: 8px;
+  font-size: 1.1rem;
+}
+
+.waiting-message strong {
+  color: var(--lol-gold);
+  font-weight: 700;
+}
+
+@keyframes waitingPulse {
+  0%, 100% { opacity: 0.7; border-color: rgba(200, 155, 60, 0.4); }
+  50% { opacity: 1; border-color: rgba(200, 155, 60, 0.7); }
+}
+
+/* Mensaje de espera después de la partida */
+.waiting-for-leader-restart {
+  background: rgba(30, 60, 114, 0.15);
+  border: 2px dashed rgba(200, 155, 60, 0.4);
+  border-radius: 8px;
+  padding: 12px 16px;
+  color: var(--lol-accent);
+  font-weight: 500;
+  animation: waitingPulse 2s ease-in-out infinite;
+  margin-bottom: 1rem;
+}
+
+.waiting-for-leader-restart i {
+  color: var(--lol-gold);
+  margin-right: 8px;
+}
+
+.waiting-for-leader-restart strong {
+  color: var(--lol-gold);
+}
+
+/* Botón secundario */
+.btn-lol.btn-secondary {
+  background: rgba(107, 114, 128, 0.8);
+  border-color: #6B7280;
+  color: var(--lol-accent);
+}
+
+.btn-lol.btn-secondary:hover {
+  background: #6B7280;
+  border-color: #4B5563;
+  transform: translateY(-2px);
+  box-shadow: 0 0 15px rgba(107, 114, 128, 0.4);
+}
+
 .game-player-item {
   display: flex;
   align-items: center;
