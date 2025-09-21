@@ -11,8 +11,10 @@ let gameState = {
   timerInterval: null,
   hasVoted: false,
   canDescribe: false,
+  hasDescribed: false,
   isCreator: false,
-  playerScores: []
+  playerScores: [],
+  currentRound: 0
 };
 
 // ====== ELEMENTOS DEL DOM ====== //
@@ -547,6 +549,13 @@ function hideAllSections() {
 }
 
 function handleDescribingPhase(phaseData) {
+  // Resetear estado al empezar nueva fase de descripción
+  if (phaseData.round !== gameState.currentRound) {
+    gameState.hasDescribed = false;
+    gameState.canDescribe = false;
+    gameState.currentRound = phaseData.round;
+  }
+  
   if (phaseData.currentPlayer) {
     gameState.currentPlayerTurn = phaseData.currentPlayer;
     elements.currentPlayerName.textContent = phaseData.currentPlayer;

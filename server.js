@@ -389,25 +389,14 @@ io.on("connection", (socket) => {
 
   socket.on('submitDescription', ({ room, word }) => {
     const roomData = rooms[room];
-    if (!roomData || roomData.state !== GAME_STATES.DESCRIBING) {
-      console.log(`submitDescription failed: room=${room}, state=${roomData?.state}`);
-      return;
-    }
+    if (!roomData || roomData.state !== GAME_STATES.DESCRIBING) return;
 
     const player = getPlayerById(room, socket.id);
-    if (!player || player.eliminated || player.hasDescribed) {
-      console.log(`submitDescription failed: player=${player?.name}, eliminated=${player?.eliminated}, hasDescribed=${player?.hasDescribed}`);
-      return;
-    }
+    if (!player || player.eliminated || player.hasDescribed) return;
 
     // Verificar si es el turno del jugador
     const currentPlayer = roomData.players[roomData.currentTurn];
-    console.log(`Turn check: currentPlayer=${currentPlayer?.name}, currentTurn=${roomData.currentTurn}, socketPlayer=${player.name}, currentPlayerId=${currentPlayer?.id}, socketId=${socket.id}`);
-    
-    if (!currentPlayer || currentPlayer.disconnected || currentPlayer.id !== socket.id) {
-      console.log(`submitDescription failed turn check: currentPlayer=${currentPlayer?.name}, disconnected=${currentPlayer?.disconnected}, idMatch=${currentPlayer?.id === socket.id}`);
-      return;
-    }
+    if (!currentPlayer || currentPlayer.disconnected || currentPlayer.id !== socket.id) return;
 
     // Marcar como descrito y avanzar turno
     player.hasDescribed = true;
@@ -649,7 +638,6 @@ function nextTurn(room) {
     attempts++;
   } while ((roomData.players[nextTurnIndex].eliminated || roomData.players[nextTurnIndex].disconnected) && attempts < roomData.players.length);
   
-  console.log(`nextTurn: from ${roomData.currentTurn} to ${nextTurnIndex}, player=${roomData.players[nextTurnIndex]?.name}, attempts=${attempts}`);
   roomData.currentTurn = nextTurnIndex;
 
   // Verificar si todos los jugadores vivos han descrito
@@ -812,8 +800,6 @@ function startNextRound(room) {
   
   roomData.currentTurn = firstAliveIndex;
   const firstPlayer = roomData.players[firstAliveIndex];
-  
-  console.log(`startNextRound: firstAliveIndex=${firstAliveIndex}, firstPlayer=${firstPlayer?.name}, totalPlayers=${roomData.players.length}`);
 
   io.to(room).emit('gameStateUpdate', {
     state: GAME_STATES.DESCRIBING,
