@@ -16,7 +16,7 @@ let gameState = {
   playerScores: [],
   currentRound: 0
 };
-
+copyToClipboard("CODIGO DE SLA > ")
 // ====== ELEMENTOS DEL DOM ====== //
 const elements = {
   // Lobby elements
@@ -119,6 +119,48 @@ function showAlert(type, message) {
   }, 4000);
 }
 
+
+// HANDLE DE MOSTRAR U OCULTAR LOBBY
+function toggleRoomUI(room) {
+  const lobbyForm = document.getElementById("lobby-form");
+  const publicRooms = document.getElementById("explore-rooms-section");
+  const leaveBtn = document.getElementById("leave-room-btn");
+  const startBtn = document.getElementById("start-game-btn");
+
+  const salaLobby = document.getElementById("sala-lobby");
+  //const codigoSala = document.getElementById("codigo-sala");
+  const codigoSalaText = document.getElementById("codigo-sala-text");
+
+  
+  if (room) {
+    lobbyForm.style.display = "none";
+    publicRooms.style.display = "none";
+    salaLobby.style.display = "inline-block";
+    codigoSalaText.textContent = room;
+    leaveBtn.style.display = "inline-block";
+    startBtn.style.display = "inline-block !important";
+  } else {
+    lobbyForm.style.display = "block";
+    publicRooms.style.display = "block";
+    salaLobby.style.display = "none";
+    leaveBtn.style.display = "none";
+    startBtn.style.display = "none";
+  }
+  // Refresho las listas para que se actualicen la info dsp de haber salido una.
+  refreshRoomList()
+}
+
+function leaveRoom() {
+  if (gameState.currentRoom) {
+    socket.emit("leaveRoom", gameState.currentRoom);
+    gameState.currentRoom = null;
+    clearSessionData();
+    toggleRoomUI(false);
+  }
+}
+
+
+
 function playNotificationSound() {
   // Simple audio notification (puedes agregar un archivo de audio real)
   const audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -175,6 +217,8 @@ function joinRoom() {
     name: playerName, 
     room: gameState.currentRoom 
   });
+
+  toggleRoomUI(gameState.currentRoom, gameState.playerName);
   
   showAlert('success', `Conectando a la sala ${gameState.currentRoom}...`);
 }
@@ -281,6 +325,9 @@ function doReconnect(playerName, roomCode) {
     name: playerName, 
     room: roomCode 
   });
+
+  // Si se reconecto a la SALA tengo qeuh acer toogle
+  toggleRoomUI(roomCode);
   
   closeReconnectDialog();
   showAlert('success', 'Intentando reconectar...');
@@ -415,11 +462,11 @@ function updatePlayersDisplay(playersData) {
     if (canStart) {
       elements.startGameBtn.classList.add('pulse');
       elements.startGameBtn.innerHTML = '<i class="fas fa-play"></i> Iniciar Juego';
-      elements.startGameBtn.style.display = 'block';
+      elements.startGameBtn.style.display = 'inline-block';
     } else {
       elements.startGameBtn.classList.remove('pulse');
       elements.startGameBtn.innerHTML = '<i class="fas fa-users"></i> Esperando más jugadores...';
-      elements.startGameBtn.style.display = 'block';
+      elements.startGameBtn.style.display = 'inline-block';
     }
   } else {
     elements.startGameBtn.style.display = 'none';

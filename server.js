@@ -174,7 +174,7 @@ io.on("connection", (socket) => {
     }
 
     const roomData = rooms[room];
-
+    
     // Verificar si la sala está llena
     if (roomData.players.length >= roomData.maxPlayers) {
       socket.emit('error', 'La sala está llena');
@@ -206,7 +206,6 @@ io.on("connection", (socket) => {
     });
 
     socket.join(room);
-
     // Actualizar actividad de la sala
     updateRoomActivity(room);
 
@@ -315,6 +314,28 @@ io.on("connection", (socket) => {
     });
   });
 
+
+  // SALE DE LA SALA
+  socket.on("leaveRoom", (roomCode) => {
+    socket.leave(roomCode);
+  
+    if (rooms[roomCode]) {
+      rooms[roomCode].players = rooms[roomCode].players.filter(p => p.id !== socket.id);
+  
+      if (rooms[roomCode].players.length === 0) {
+        delete rooms[roomCode]; // borra la sala si queda vacía
+      } else {
+        io.to(roomCode).emit("playersUpdate", {
+          players: rooms[roomCode].players,
+          gameState: rooms[roomCode].state
+        });
+      }
+    }
+  
+    socket.emit("leftRoom");
+  });
+
+  // Comienza el juego
   socket.on("startGame", async (room) => {
     if (!rooms[room]) return;
     
@@ -687,6 +708,12 @@ io.on("connection", (socket) => {
       }
     }
   });
+  // TESTEO
+  socket.on("test", () => {
+      console.log("testeo del socket");
+      console.log(rooms);
+  });
+
 });
 
 function nextTurn(room) {
