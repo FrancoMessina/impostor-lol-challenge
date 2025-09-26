@@ -16,7 +16,7 @@ let gameState = {
   playerScores: [],
   currentRound: 0
 };
-copyToClipboard("CODIGO DE SLA > ")
+
 // ====== ELEMENTOS DEL DOM ====== //
 const elements = {
   // Lobby elements
@@ -1125,7 +1125,7 @@ socket.on('gameEnd', (endData) => {
         </div>
         <div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
           <button class="btn btn-lol btn-warning btn-lg" onclick="restartGame()" style="min-width: 180px;">
-            <i class="fas fa-play"></i> ¡NUEVA PARTIDA!
+            <i class="fas fa-play"></i> ¡Proxima ronda!
           </button>
           <button class="btn btn-lol btn-secondary" onclick="goBackToLobby()">
             <i class="fas fa-sign-out-alt"></i> Salir al Lobby

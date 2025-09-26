@@ -31,3 +31,16 @@ document.getElementById("codigo-sala").addEventListener('click', function(e){
     copyToClipboard(salaCode);
     showAlert('success', 'Codigo de sala copiado');
 })
+
+
+function showAlert(type, message) {
+  const alertElement = type === 'error' ? elements.errorAlert : elements.successAlert;
+  const messageElement = type === 'error' ? elements.errorMessage : elements.successMessage;
+  
+  messageElement.textContent = message;
+  alertElement.style.display = 'block';
+  
+  setTimeout(() => {
+    alertElement.style.display = 'none';
+  }, 4000);
+}

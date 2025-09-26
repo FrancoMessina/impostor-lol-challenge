@@ -27,8 +27,8 @@ const GAME_STATES = {
 // Configuración del juego
 const GAME_CONFIG = {
   MAX_PLAYERS: 5,
-  DESCRIBE_TIME: 20, // segundos por turno
-  DEBATE_TIME: 50, // segundos para debate
+  DESCRIBE_TIME: 10, // segundos por turno
+  DEBATE_TIME: 10, // segundos para debate
   VOTING_TIME: 30 // segundos para votar
 };
 
@@ -583,17 +583,20 @@ io.on("connection", (socket) => {
         let shuffledPlayers = [...roomData.players].sort(() => Math.random() - 0.5);
         
         // Seleccionar múltiples impostores
-        const impostorIndices = [];
-        for (let i = 0; i < roomData.numImpostors && i < shuffledPlayers.length; i++) {
-          impostorIndices.push(i);
+        const impostorIndices = new Set();
+        while (impostorIndices.size < roomData.numImpostors) {
+          const randomIndex = Math.floor(Math.random() * shuffledPlayers.length);
+          impostorIndices.add(randomIndex);
         }
+
         
         shuffledPlayers.forEach((player, index) => {
-          player.impostor = impostorIndices.includes(index);
+          player.impostor = impostorIndices.has(index);
           player.eliminated = false;
           player.hasVoted = false;
           player.hasDescribed = false;
         });
+        
 
         roomData.players = shuffledPlayers;
         roomData.champion = championInfo.name;
@@ -604,11 +607,10 @@ io.on("connection", (socket) => {
         roomData.round++;
 
         // Encontrar el primer jugador vivo y conectado
-        let firstAliveIndex = 0;
-        while (firstAliveIndex < roomData.players.length && (roomData.players[firstAliveIndex].eliminated || roomData.players[firstAliveIndex].disconnected)) {
-          firstAliveIndex++;
-        }
-        roomData.currentTurn = firstAliveIndex;
+        const alivePlayers = shuffledPlayers.filter(p => !p.eliminated && !p.disconnected);
+        const randomStartIndex = Math.floor(Math.random() * alivePlayers.length);
+        roomData.currentTurn = shuffledPlayers.indexOf(alivePlayers[randomStartIndex]);
+
 
         // Enviar roles a cada jugador
         roomData.players.forEach(player => {
@@ -863,6 +865,11 @@ function processVoteResults(room) {
     type: 'system',
     message: resultMessage,
     timestamp: Date.now()
+  });
+
+  // ESTO AGREGE YO FRANKY TEST
+  io.to(room).emit('gameStateUpdate', {
+    state: GAME_STATES.RESULTS
   });
 
   // Verificar fin del juego
