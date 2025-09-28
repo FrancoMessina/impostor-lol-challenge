@@ -27,8 +27,8 @@ const GAME_STATES = {
 // Configuración del juego
 const GAME_CONFIG = {
   MAX_PLAYERS: 5,
-  DESCRIBE_TIME: 10, // segundos por turno
-  DEBATE_TIME: 10, // segundos para debate
+  DESCRIBE_TIME: 30, // segundos por turno
+  DEBATE_TIME: 30, // segundos para debate
   VOTING_TIME: 30 // segundos para votar
 };
 
