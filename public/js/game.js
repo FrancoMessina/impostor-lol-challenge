@@ -663,6 +663,8 @@ function handleResultsPhase(phaseData) {
 
 function createVotingButtons(candidates) {
   elements.votingButtons.innerHTML = '';
+  // Testeo de borrar VOTOS por si antes hubo una votacion previa. 
+  elements.voteStatus.innerHTML = '';
   
   candidates.forEach(candidate => {
     if (candidate !== gameState.playerName) { // No puedes votarte a ti mismo
@@ -991,6 +993,7 @@ socket.on('timerUpdate', ({ duration, startTime }) => {
 
 socket.on('voteUpdate', (voteData) => {
   console.log('🗳️ Actualización de votos:', voteData);
+  
   
   let voteDetailsHTML = `<small>Votos: ${voteData.totalVotes}/${voteData.requiredVotes}</small>`;
   

@@ -826,31 +826,45 @@ function processVoteResults(room) {
     clearTimeout(roomData.timer);
   }
 
-  // Encontrar el jugador con más votos
   let maxVotes = 0;
-  let eliminatedPlayer = null;
-  
+  const candidates = [];
+
+  // Loopea los jugadores y sus respectivos votos para encontrar a los que mas votos tienen y los mete en la variable candidates. 
   for (const [playerName, votes] of Object.entries(roomData.votes)) {
-    if (votes > maxVotes) {
-      maxVotes = votes;
-      eliminatedPlayer = roomData.players.find(p => p.name === playerName);
+      if (votes > maxVotes) {
+        maxVotes = votes;
+        candidates.length = 0; // limpiar candidatos, no se hace candidates = [] porque cambia la referencia en memoria. (no refactorizar)
+        candidates.push(playerName);
+      } else if (votes === maxVotes && votes > 0) {
+        candidates.push(playerName);
+      }
     }
-  }
 
+  let eliminatedPlayer = null;
   let resultMessage = '';
-  
-  if (!eliminatedPlayer || maxVotes === 0) {
+
+  // Si candidates o max votes es 0, nadie voto no se elimina nadie.
+  // Si candidates es mayor a uno es que hay más de de un jugador con la misma cantidad de max votes, nadie es es eliminado
+  // Despues se hace la logica de un jugador que va a ser eliminado y nos fijamos si es el impostor o no .
+  if (candidates.length === 0 || maxVotes === 0) {
+    // Nadie votó
     resultMessage = 'No hubo suficientes votos. Nadie fue eliminado.';
+  } else if (candidates.length > 1) {
+    // Empate
+    resultMessage = `Hubo un empate entre ${candidates.join(', ')}. Nadie fue eliminado. 🤝`;
   } else {
+    // Un solo jugador con mayoría → eliminado
+    const selectedName = candidates[0];
+    eliminatedPlayer = roomData.players.find(p => p.name === selectedName);
+
     eliminatedPlayer.eliminated = true;
-    
+
     if (eliminatedPlayer.impostor) {
-      resultMessage = `${eliminatedPlayer.name} era el IMPOSTOR! Los investigadores ganan! 🏆`;
+      resultMessage = `¡${eliminatedPlayer.name} era el impostor! ¡Los investigadores ganan! 🏆`;
     } else {
-      resultMessage = `${eliminatedPlayer.name} era un investigador... El impostor sigue entre ustedes. 😈`;
+      resultMessage = `${eliminatedPlayer.name} era un investigador... el impostor sigue entre ustedes. 😈`;
     }
   }
-
   roomData.state = GAME_STATES.RESULTS;
 
   io.to(room).emit('voteResults', {
@@ -867,7 +881,7 @@ function processVoteResults(room) {
     timestamp: Date.now()
   });
 
-  // ESTO AGREGE YO FRANKY TEST
+  // ESTO AGREGE YO FRANKY TEST , ESTO FUNCIONA, cambie el game state
   io.to(room).emit('gameStateUpdate', {
     state: GAME_STATES.RESULTS
   });
