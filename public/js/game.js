@@ -43,6 +43,7 @@ const elements = {
   
   // Game elements
   currentRoomCode: document.getElementById('current-room-code'),
+  currentPlayerUsername: document.getElementById('current-player-username'),
   currentRound: document.getElementById('current-round'),
   gamePhase: document.getElementById('game-phase'),
   timerText: document.getElementById('timer-text'),
@@ -439,6 +440,10 @@ function updatePlayersDisplay(playersData) {
         if (players[index].eliminated) {
           slot.classList.add('eliminated');
         }
+        // 🔥 Nuevo: marcar si soy yo mismo
+        if (players[index].name === gameState.playerName) {
+          slot.classList.add('my-player');
+        }
       } else {
         slot.className = 'empty-slot';
         slot.textContent = 'Esperando jugador...';
@@ -558,6 +563,7 @@ function switchToGameScreen() {
   elements.lobbyScreen.style.display = 'none';
   elements.gameScreen.style.display = 'block';
   elements.currentRoomCode.textContent = gameState.currentRoom;
+  elements.currentPlayerUsername.textContent = gameState.playerName;
 }
 
 function updateGamePhase(phaseData) {

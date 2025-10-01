@@ -315,7 +315,7 @@ body {
 .game-header {
   background: rgba(15, 32, 39, 0.95);
   border-bottom: 3px solid var(--lol-gold);
-  padding: 1rem 0;
+  padding-top: 1rem;
   backdrop-filter: blur(10px);
   position: sticky;
   top: 0;
@@ -709,6 +709,7 @@ body {
   border-radius: 6px;
 }
 
+
 .game-controls {
   display: flex;
   flex-direction: column;
@@ -768,6 +769,12 @@ body {
   opacity: 0.5;
   background: rgba(220, 38, 38, 0.1);
   border-left-color: var(--impostor-color);
+}
+
+.player-slot.my-player {
+  color: #c89b3c;
+  font-weight: bold;
+  text-shadow: 0 0 5px #000;
 }
 
 .game-player-item.current-turn {
