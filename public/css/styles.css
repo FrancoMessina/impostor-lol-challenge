@@ -946,10 +946,87 @@ body {
   font-size: 0.8rem;
 }
 
+/* ====== CONTROLES DE AUDIO ====== */
+.audio-controls {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 2000;
+  display: flex;
+  gap: 10px;
+}
+
+.audio-toggle-btn {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: var(--lol-gold);
+  border: 2px solid rgba(200, 155, 60, 0.8);
+  color: var(--lol-dark-blue);
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(200, 155, 60, 0.3);
+  backdrop-filter: blur(10px);
+}
+
+.audio-toggle-btn:hover {
+  transform: scale(1.1);
+  background: #B45309;
+  box-shadow: 0 6px 20px rgba(200, 155, 60, 0.5);
+}
+
+.audio-toggle-btn:active {
+  transform: scale(0.95);
+}
+
+.audio-toggle-btn.muted {
+  background: rgba(107, 114, 128, 0.9);
+  border-color: #6B7280;
+  color: #F3F4F6;
+  box-shadow: 0 4px 15px rgba(107, 114, 128, 0.3);
+}
+
+.audio-toggle-btn.muted:hover {
+  background: #6B7280;
+  box-shadow: 0 6px 20px rgba(107, 114, 128, 0.5);
+}
+
+/* Animación cuando se cambia el estado */
+.audio-toggle-btn i {
+  transition: all 0.3s ease;
+}
+
+.audio-toggle-btn:not(.muted) i {
+  animation: audioActive 2s ease-in-out infinite;
+}
+
+@keyframes audioActive {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+/* Responsive para móviles */
+@media (max-width: 768px) {
+  .audio-controls {
+    top: 15px;
+    right: 15px;
+  }
+  
+  .audio-toggle-btn {
+    width: 45px;
+    height: 45px;
+    font-size: 1.1rem;
+  }
+}
+
 /* ====== ALERTAS FLOTANTES ====== */
 .alert-floating {
   position: fixed;
-  top: 20px;
+  top: 80px; /* Mover abajo del botón de audio */
   right: 20px;
   z-index: 1000;
   animation: alertSlide 0.5s ease;

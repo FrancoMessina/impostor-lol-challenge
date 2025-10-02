@@ -17,6 +17,12 @@ let gameState = {
   currentRound: 0
 };
 
+// ====== CONFIGURACIÓN DE AUDIO ====== //
+let audioSettings = {
+  soundEnabled: true,
+  volume: 0.3
+};
+
 // ====== ELEMENTOS DEL DOM ====== //
 const elements = {
   // Lobby elements
@@ -162,22 +168,97 @@ function leaveRoom() {
 
 
 
+// ====== FUNCIONES DE AUDIO ====== //
+function initAudioSettings() {
+  try {
+    const saved = localStorage.getItem('lolImpostorAudio');
+    if (saved) {
+      audioSettings = {...audioSettings, ...JSON.parse(saved)};
+    }
+  } catch (error) {
+    console.warn('Error cargando configuración de audio:', error);
+  }
+  updateAudioButton();
+}
+
+function saveAudioSettings() {
+  try {
+    localStorage.setItem('lolImpostorAudio', JSON.stringify(audioSettings));
+  } catch (error) {
+    console.warn('Error guardando configuración de audio:', error);
+  }
+}
+
+function toggleSound() {
+  audioSettings.soundEnabled = !audioSettings.soundEnabled;
+  saveAudioSettings();
+  updateAudioButton();
+  
+  // Feedback visual
+  showAlert(
+    audioSettings.soundEnabled ? 'success' : 'info', 
+    audioSettings.soundEnabled ? '🔊 Sonido activado' : '🔇 Sonido silenciado'
+  );
+  
+  // Si se activa el sonido, reproducir sonido de confirmación
+  if (audioSettings.soundEnabled) {
+    setTimeout(() => playNotificationSound(), 200);
+  }
+}
+
+function updateAudioButton() {
+  const audioBtn = document.getElementById('audio-toggle-btn');
+  if (audioBtn) {
+    const icon = audioBtn.querySelector('i');
+    if (audioSettings.soundEnabled) {
+      icon.className = 'fas fa-volume-up';
+      audioBtn.classList.remove('muted');
+      audioBtn.setAttribute('title', 'Silenciar sonidos');
+    } else {
+      icon.className = 'fas fa-volume-mute';
+      audioBtn.classList.add('muted');
+      audioBtn.setAttribute('title', 'Activar sonidos');
+    }
+  }
+}
+
 function playNotificationSound() {
-  // Simple audio notification (puedes agregar un archivo de audio real)
-  const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-  const oscillator = audioContext.createOscillator();
-  const gainNode = audioContext.createGain();
+  // Verificar si el sonido está habilitado
+  if (!audioSettings.soundEnabled) {
+    return; // No reproducir sonido si está silenciado
+  }
   
-  oscillator.connect(gainNode);
-  gainNode.connect(audioContext.destination);
-  
-  oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
-  oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.1);
-  gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-  gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
-  
-  oscillator.start(audioContext.currentTime);
-  oscillator.stop(audioContext.currentTime + 0.3);
+  try {
+    // Simple audio notification con control de volumen
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    // Diferentes tonos según el estado del juego
+    let frequency1 = 800;
+    let frequency2 = 600;
+    
+    if (gameState.gamePhase === 'voting') {
+      frequency1 = 900; // Más agudo para votación
+      frequency2 = 700;
+    } else if (gameState.gamePhase === 'describing' && gameState.isImpostor) {
+      frequency1 = 750; // Ligeramente diferente para impostor
+      frequency2 = 550;
+    }
+    
+    oscillator.frequency.setValueAtTime(frequency1, audioContext.currentTime);
+    oscillator.frequency.setValueAtTime(frequency2, audioContext.currentTime + 0.1);
+    gainNode.gain.setValueAtTime(audioSettings.volume, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+    
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.3);
+  } catch (error) {
+    console.warn('Error reproduciendo sonido:', error);
+  }
 }
 
 // ====== FUNCIONES DE LOBBY ====== //
@@ -752,8 +833,9 @@ function addChatMessage(messageData) {
   // Auto-scroll al último mensaje
   elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
   
-  // Efecto de notificación
-  if (messageData.type !== 'system') {
+  // Efecto de notificación (solo para mensajes importantes)
+  if (messageData.type === 'description' || 
+      (messageData.type === 'player' && messageData.playerName !== gameState.playerName)) {
     playNotificationSound();
   }
 }
@@ -915,6 +997,9 @@ function updateGamePlayersList(players) {
 // ====== EVENT LISTENERS ====== //
 document.addEventListener('DOMContentLoaded', function() {
   console.log('🎮 LOL Impostor cargado');
+  
+  // Inicializar configuración de audio
+  initAudioSettings();
   
   // Cargar salas públicas al iniciar
   loadPublicRooms();
@@ -1465,6 +1550,9 @@ window.submitDescription = submitDescription;
 window.goBackToLobby = goBackToLobby;
 window.doReconnect = doReconnect;
 window.closeReconnectDialog = closeReconnectDialog;
+
+// Funciones de audio
+window.toggleSound = toggleSound;
 
 // Nuevas funciones para salas públicas
 window.refreshRoomList = refreshRoomList;
